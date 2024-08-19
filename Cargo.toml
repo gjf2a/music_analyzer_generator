@@ -1,0 +1,10 @@
+[package]
+name = "music_analyzer_generator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+enum-iterator = "2.1.0"
+midi-msg = "0.7.1"
+midi_note_recorder = {git = "https://github.com/gjf2a/midi_note_recorder"}
+rand = "0.8"
