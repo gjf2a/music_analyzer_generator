@@ -1,6 +1,8 @@
+use std::fmt::Display;
+
 use enum_iterator::Sequence;
-use midi_note_recorder::note_velocity_from;
 use midi_msg::MidiMsg;
+use midi_note_recorder::{note_velocity_from, Recording};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Sequence)]
 pub enum NoteLetter {
@@ -35,6 +37,36 @@ impl NoteLetter {
     }
 }
 
+const MAJOR_ROOT_IDS: [(NoteLetter, Accidental); 12] = [
+    (NoteLetter::C, Accidental::Natural),
+    (NoteLetter::D, Accidental::Flat),
+    (NoteLetter::D, Accidental::Natural),
+    (NoteLetter::E, Accidental::Flat),
+    (NoteLetter::E, Accidental::Natural),
+    (NoteLetter::F, Accidental::Natural),
+    (NoteLetter::F, Accidental::Sharp),
+    (NoteLetter::G, Accidental::Natural),
+    (NoteLetter::A, Accidental::Flat),
+    (NoteLetter::A, Accidental::Natural),
+    (NoteLetter::B, Accidental::Flat),
+    (NoteLetter::B, Accidental::Natural),
+];
+
+const MINOR_ROOT_IDS: [(NoteLetter, Accidental); 12] = [
+    (NoteLetter::C, Accidental::Natural),
+    (NoteLetter::C, Accidental::Sharp),
+    (NoteLetter::D, Accidental::Natural),
+    (NoteLetter::E, Accidental::Flat),
+    (NoteLetter::E, Accidental::Natural),
+    (NoteLetter::F, Accidental::Natural),
+    (NoteLetter::F, Accidental::Sharp),
+    (NoteLetter::G, Accidental::Natural),
+    (NoteLetter::G, Accidental::Sharp),
+    (NoteLetter::A, Accidental::Natural),
+    (NoteLetter::B, Accidental::Flat),
+    (NoteLetter::B, Accidental::Natural),
+];
+
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Accidental {
     Flat,
@@ -53,28 +85,146 @@ impl Accidental {
 
     pub fn pitch_shift(&self, natural: u8) -> Option<u8> {
         match self {
-            Accidental::Flat => if natural > 0 {Some(natural - 1)} else {None},
+            Accidental::Flat => {
+                if natural > 0 {
+                    Some(natural - 1)
+                } else {
+                    None
+                }
+            }
             Accidental::Natural => Some(natural),
-            Accidental::Sharp => if natural < u8::MAX {Some(natural + 1)} else {None},
+            Accidental::Sharp => {
+                if natural < u8::MAX {
+                    Some(natural + 1)
+                } else {
+                    None
+                }
+            }
         }
     }
 }
 
-pub enum ChordMode {
-    Major, 
-    Minor
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub struct Chord {
+    name: ChordName,
+    notes: ActivePitches,
 }
 
-impl ChordMode {
-    
+impl Display for Chord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} ({:?})",
+            self.name,
+            self.notes.iter().collect::<Vec<_>>()
+        )
+    }
+}
+
+impl Chord {
+    pub fn chords_from(recording: &Recording) -> Vec<(f64, Self)> {
+        ActivePitches::pitch_sequence_from(recording)
+            .iter()
+            .filter_map(|(t, notes)| {
+                ChordName::new(*notes).map(|name| {
+                    (
+                        *t,
+                        Self {
+                            name,
+                            notes: *notes,
+                        },
+                    )
+                })
+            })
+            .collect()
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub struct ChordName {
+    note: NoteLetter,
+    accidental: Accidental,
+    mode: ChordMode,
+}
+
+impl Display for ChordName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:?}{} {:?}",
+            self.note,
+            self.accidental.symbol(),
+            self.mode
+        )
+    }
+}
+
+impl ChordName {
+    pub fn new(active: ActivePitches) -> Option<Self> {
+        let (pitches, diffs) = ReducedPitches::new(active).pitches_diffs();
+        first_third_index(&diffs).map(|root| {
+            let first = diffs[root];
+            let second = diffs[(root + 1) % diffs.len()];
+            if first == 3 {
+                let (note, accidental) = MINOR_ROOT_IDS[pitches[root] as usize];
+                if second == 3 {
+                    ChordName {
+                        note,
+                        accidental,
+                        mode: ChordMode::Diminished,
+                    }
+                } else {
+                    ChordName {
+                        note,
+                        accidental,
+                        mode: ChordMode::Minor,
+                    }
+                }
+            } else {
+                let (note, accidental) = MAJOR_ROOT_IDS[pitches[root] as usize];
+                if second == 3 {
+                    ChordName {
+                        note,
+                        accidental,
+                        mode: ChordMode::Major,
+                    }
+                } else {
+                    ChordName {
+                        note,
+                        accidental,
+                        mode: ChordMode::Augmented,
+                    }
+                }
+            }
+        })
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Sequence)]
+pub enum ChordMode {
+    Major,
+    Minor,
+    Diminished,
+    Augmented,
 }
 
 #[derive(Copy, Clone, Default, Eq, PartialEq)]
 pub struct ActivePitches {
-    on: u128
+    on: u128,
 }
 
 impl ActivePitches {
+    pub fn pitch_sequence_from(recording: &Recording) -> Vec<(f64, Self)> {
+        let mut current = Self::default();
+        let mut result = Vec::new();
+        let mut queue = recording.midi_queue();
+        while let Some((time, msg)) = queue.pop_front() {
+            current.update_from(&msg);
+            result.push((time, current));
+        }
+        result
+    }
+
     pub fn update_from(&mut self, msg: &MidiMsg) {
         if let Some((pitch, velocity)) = note_velocity_from(msg) {
             if velocity > 0 {
@@ -85,10 +235,6 @@ impl ActivePitches {
         }
     }
 
-    pub fn active_pitches(&self) -> Vec<u8> {
-        (0..=127).filter(|p| self.on & (1 << p) > 0).collect()
-    }
-
     pub fn len(&self) -> usize {
         self.on.count_ones() as usize
     }
@@ -96,6 +242,58 @@ impl ActivePitches {
     pub fn is_active(&self, pitch: u8) -> bool {
         self.on & (1 << pitch) != 0
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = u8> + '_ {
+        (0..=127).filter(|p| self.on & (1 << p) > 0)
+    }
+}
+
+#[derive(Copy, Clone, Default, Eq, PartialEq)]
+pub struct ReducedPitches {
+    on: u16,
+}
+
+impl ReducedPitches {
+    pub fn new(active: ActivePitches) -> Self {
+        let mut result = Self::default();
+        for pitch in active.iter() {
+            result.on |= 1 << (pitch % 12);
+        }
+        result
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = u8> + '_ {
+        (0..12).filter(|p| self.on & (1 << p) > 0)
+    }
+
+    pub fn pitches_diffs(&self) -> (Vec<u8>, Vec<u8>) {
+        let mut diffs = Vec::new();
+        let pitches = self.iter().collect::<Vec<_>>();
+        for i in 0..pitches.len() {
+            let next_pitch = if i + 1 < pitches.len() {
+                pitches[i + 1]
+            } else {
+                12 + pitches[(i + 1) % pitches.len()]
+            };
+            diffs.push(next_pitch - pitches[i]);
+        }
+        (pitches, diffs)
+    }
+}
+
+fn major_or_minor_third(interval: u8) -> bool {
+    interval == 3 || interval == 4
+}
+
+fn first_third_index(diffs: &[u8]) -> Option<usize> {
+    let mut i = 0;
+    while i < diffs.len() {
+        if major_or_minor_third(diffs[i]) && major_or_minor_third(diffs[(i + 1) % diffs.len()]) {
+            return Some(i);
+        }
+        i += 1;
+    }
+    None
 }
 
 #[cfg(test)]
@@ -120,11 +318,13 @@ mod tests {
                 let msg = midi_msg_from(Channel::Ch1, note, 1);
                 let prev_len = active.len();
                 active.update_from(&msg);
-                assert!(already && active.len() == prev_len || !already && active.len() == prev_len + 1);
+                assert!(
+                    already && active.len() == prev_len || !already && active.len() == prev_len + 1
+                );
                 assert!(active.is_active(note));
                 active_tester.insert(note);
             } else {
-                let pitches = active.active_pitches();
+                let pitches = active.iter().collect::<Vec<_>>();
                 let remove = pitches[rng.gen_range(0..pitches.len())];
                 let msg = midi_msg_from(Channel::Ch1, remove, 0);
                 let prev_len = active.len();
@@ -134,7 +334,7 @@ mod tests {
                 active_tester.remove(&remove);
             }
             let comp = active_tester.iter().copied().collect::<Vec<_>>();
-            assert_eq!(comp, active.active_pitches());
+            assert_eq!(comp, active.iter().collect::<Vec<_>>());
         }
     }
 }
