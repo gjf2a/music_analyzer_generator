@@ -5,8 +5,8 @@ edition = "2021"
 
 [dependencies]
 midi_note_recorder = {git = "https://github.com/gjf2a/midi_note_recorder"}
-enum-iterator = "2.1.0"
-midi-msg = "0.7.1"
+enum-iterator = "2.1"
+midi-msg = "0.7"
 rand = "0.8"
 
 [dev-dependencies]
