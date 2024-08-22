@@ -161,42 +161,61 @@ impl Display for ChordName {
 
 impl ChordName {
     pub fn new(active: ActivePitches) -> Option<Self> {
+        SimpleChordInfo::new(active).map(|info| info.mode())
+    }
+}
+
+struct SimpleChordInfo {
+    pitches: Vec<u8>,
+    root_index: usize,
+    thirds: Vec<u8>,
+}
+
+impl SimpleChordInfo {
+    fn new(active: ActivePitches) -> Option<Self> {
         let (pitches, diffs) = ReducedPitches::new(active).pitches_diffs();
-        first_third_index(&diffs).map(|root| {
-            let first = diffs[root];
-            let second = diffs[(root + 1) % diffs.len()];
-            if first == 3 {
-                let (note, accidental) = MINOR_ROOT_IDS[pitches[root] as usize];
-                if second == 3 {
-                    ChordName {
-                        note,
-                        accidental,
-                        mode: ChordMode::Diminished,
-                    }
-                } else {
-                    ChordName {
-                        note,
-                        accidental,
-                        mode: ChordMode::Minor,
-                    }
-                }
-            } else {
-                let (note, accidental) = MAJOR_ROOT_IDS[pitches[root] as usize];
-                if second == 3 {
-                    ChordName {
-                        note,
-                        accidental,
-                        mode: ChordMode::Major,
-                    }
-                } else {
-                    ChordName {
-                        note,
-                        accidental,
-                        mode: ChordMode::Augmented,
-                    }
-                }
+        first_third_index(&diffs).map(|root_index| {
+            let thirds = (0..diffs.len())
+                .map(|i| diffs[(root_index + i) % diffs.len()])
+                .collect();
+            Self {
+                pitches,
+                root_index,
+                thirds,
             }
         })
+    }
+
+    fn root_pitch_index(&self) -> usize {
+        self.pitches[self.root_index] as usize
+    }
+
+    fn mode(&self) -> ChordName {
+        let first = self.thirds[0];
+        let second = self.thirds[1];
+        if first == 3 {
+            let (note, accidental) = MINOR_ROOT_IDS[self.root_pitch_index()];
+            ChordName {
+                note,
+                accidental,
+                mode: if second == 3 {
+                    ChordMode::Diminished
+                } else {
+                    ChordMode::Minor
+                },
+            }
+        } else {
+            let (note, accidental) = MAJOR_ROOT_IDS[self.root_pitch_index()];
+            ChordName {
+                note,
+                accidental,
+                mode: if second == 3 {
+                    ChordMode::Major
+                } else {
+                    ChordMode::Augmented
+                },
+            }
+        }
     }
 }
 

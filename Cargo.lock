@@ -120,8 +120,9 @@ dependencies = [
 [[package]]
 name = "midi_note_recorder"
 version = "0.1.1"
-source = "git+https://github.com/gjf2a/midi_note_recorder#0dff8fe8a7ca09cb56aa34d0454b5b7c03c42279"
+source = "git+https://github.com/gjf2a/midi_note_recorder#38093229e82fb1fcb2f88afc43107db6fd99260e"
 dependencies = [
+ "anyhow",
  "crossbeam-queue",
  "midi-msg",
  "serde",
@@ -137,8 +138,6 @@ dependencies = [
  "midi-msg",
  "midi_note_recorder",
  "rand",
- "serde",
- "serde_json",
 ]
 
 [[package]]
