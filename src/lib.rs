@@ -125,17 +125,7 @@ impl Chord {
     pub fn chords_from(recording: &Recording) -> Vec<(f64, Self)> {
         ActivePitches::pitch_sequence_from(recording)
             .iter()
-            .filter_map(|(t, notes)| {
-                ChordName::new(*notes).map(|name| {
-                    (
-                        *t,
-                        Self {
-                            name,
-                            notes: *notes,
-                        },
-                    )
-                })
-            })
+            .filter_map(|(t, n)| ChordName::new(*n).map(|name| (*t, Self { name, notes: *n })))
             .collect()
     }
 }
@@ -314,6 +304,30 @@ fn first_third_index(diffs: &[u8]) -> Option<usize> {
     }
     None
 }
+
+pub fn durations_from(recording: &Recording) -> Vec<f64> {
+    let mut result = Vec::new();
+    let mut queue = recording.midi_queue();
+    let (mut last_time, _) = queue.pop_front().unwrap();
+    while let Some((time, _)) = queue.pop_front() {
+        result.push(time - last_time);
+        last_time = time;
+    }
+    result
+}
+
+pub fn durations_notes_from(recording: &Recording) -> Vec<(f64, MidiMsg)> {
+    let mut result = Vec::new();
+    let mut queue = recording.midi_queue();
+    let (mut last_time, mut last_msg) = queue.pop_front().unwrap();
+    while let Some((time, msg)) = queue.pop_front() {
+        result.push((time - last_time, last_msg));
+        last_msg = msg;
+        last_time = time;
+    }
+    result
+}
+
 
 #[cfg(test)]
 mod tests {
