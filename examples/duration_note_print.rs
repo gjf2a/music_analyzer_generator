@@ -1,4 +1,4 @@
-use midi_note_recorder::Recording;
+use midi_note_recorder::{note_velocity_from, Recording};
 use music_analyzer_generator::durations_notes_from;
 
 fn main() -> anyhow::Result<()> {
@@ -7,8 +7,10 @@ fn main() -> anyhow::Result<()> {
         println!("Usage: duration_print filename")
     }
     let recording: Recording = Recording::from_file(args[1].as_str())?;
-    for d in durations_notes_from(&recording) {
-        println!("{d:?}");
+    for (d, msg) in durations_notes_from(&recording) {
+        if let Some((n, v)) = note_velocity_from(&msg) {
+            println!("{d:.2}\t{n}\t{v}");
+        }
     }
     Ok(())
 }

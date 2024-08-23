@@ -305,25 +305,19 @@ fn first_third_index(diffs: &[u8]) -> Option<usize> {
     None
 }
 
-pub fn durations_from(recording: &Recording) -> Vec<f64> {
-    let mut result = Vec::new();
-    let mut queue = recording.midi_queue();
-    let (mut last_time, _) = queue.pop_front().unwrap();
-    while let Some((time, _)) = queue.pop_front() {
-        result.push(time - last_time);
-        last_time = time;
-    }
-    result
-}
-
 pub fn durations_notes_from(recording: &Recording) -> Vec<(f64, MidiMsg)> {
     let mut result = Vec::new();
     let mut queue = recording.midi_queue();
     let (mut last_time, mut last_msg) = queue.pop_front().unwrap();
     while let Some((time, msg)) = queue.pop_front() {
-        result.push((time - last_time, last_msg));
-        last_msg = msg;
-        last_time = time;
+        if let Some((n, v)) = note_velocity_from(&msg) {
+            let (old_n, _) = note_velocity_from(&last_msg).unwrap();
+            if v > 0 || n == old_n {
+                result.push((time - last_time, last_msg));
+                last_msg = msg;
+                last_time = time;
+            }
+        }
     }
     result
 }
