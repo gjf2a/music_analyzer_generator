@@ -305,15 +305,16 @@ fn first_third_index(diffs: &[u8]) -> Option<usize> {
     None
 }
 
-pub fn durations_notes_from(recording: &Recording) -> Vec<(f64, MidiMsg)> {
+pub fn durations_notes_from(recording: &Recording) -> Vec<(f64, u8, u8)> {
     let mut result = Vec::new();
     let mut queue = recording.midi_queue();
     let (mut last_time, mut last_msg) = queue.pop_front().unwrap();
     while let Some((time, msg)) = queue.pop_front() {
         if let Some((n, v)) = note_velocity_from(&msg) {
-            let (old_n, _) = note_velocity_from(&last_msg).unwrap();
+            let (old_n, old_v) = note_velocity_from(&last_msg).unwrap();
             if v > 0 || n == old_n {
-                result.push((time - last_time, last_msg));
+                // TODO: Insert a zero-velocity note for the predecessor if needed.
+                result.push((time - last_time, old_n, old_v));
                 last_msg = msg;
                 last_time = time;
             }
