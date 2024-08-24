@@ -311,7 +311,15 @@ pub fn durations_notes_from(recording: &Recording) -> Vec<(f64, u8, u8)> {
     if let Some((mut last_time, mut last_n, mut last_v)) = find_first_note(&mut queue) {
         while let Some((time, msg)) = queue.pop_front() {
             if let Some((n, v)) = note_velocity_from(&msg) {
-                if v > 0 || n == last_n {
+                if last_v > 0 {
+                    if let Some((_, end_n, end_v)) = result.last().copied() {
+                        if end_v > 0 {
+                            result.push((0.0, end_n, 0));
+                       }
+                    }
+                }
+
+                if v > 0 || n == last_n {                    
                     result.push((time - last_time, last_n, last_v));
                     last_time = time;
                     last_n = n;
