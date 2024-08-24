@@ -315,11 +315,11 @@ pub fn durations_notes_from(recording: &Recording) -> Vec<(f64, u8, u8)> {
                     if let Some((_, end_n, end_v)) = result.last().copied() {
                         if end_v > 0 {
                             result.push((0.0, end_n, 0));
-                       }
+                        }
                     }
                 }
 
-                if v > 0 || n == last_n {                    
+                if v > 0 || n == last_n {
                     result.push((time - last_time, last_n, last_v));
                     last_time = time;
                     last_n = n;
@@ -339,7 +339,6 @@ fn find_first_note(queue: &mut VecDeque<(f64, MidiMsg)>) -> Option<(f64, u8, u8)
     }
     None
 }
-
 
 #[cfg(test)]
 mod tests {
