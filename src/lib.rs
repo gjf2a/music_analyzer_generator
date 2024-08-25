@@ -328,6 +328,10 @@ pub fn durations_notes_from(recording: &Recording) -> Vec<(f64, u8, u8)> {
             }
         }
     }
+    if result.len() % 2 == 1 {
+        let (_, n, _) = result.last().unwrap();
+        result.push((0.0, *n, 0));
+    }
     result
 }
 
@@ -338,6 +342,95 @@ fn find_first_note(queue: &mut VecDeque<(f64, MidiMsg)>) -> Option<(f64, u8, u8)
         }
     }
     None
+}
+
+pub fn partitioned_melody(melody: &Vec<(f64, u8, u8)>, stop_length: usize) -> Vec<ClosedInterval> {
+    pm_help(ClosedInterval::indices(melody), melody, stop_length)
+}
+
+fn pm_help(
+    interval: ClosedInterval,
+    melody: &Vec<(f64, u8, u8)>,
+    stop_length: usize,
+) -> Vec<ClosedInterval> {
+    if interval.len() <= stop_length {
+        return vec![interval];
+    } else {
+        let max_time_index = interval
+            .iter()
+            .map(|i| (i, melody[i].0))
+            .max_by(|(_, t1), (_, t2)| t1.partial_cmp(t2).unwrap())
+            .unwrap()
+            .0;
+        if max_time_index < interval.end {
+            let (i1, i2) = interval.divided(max_time_index);
+            let mut v1 = pm_help(i1, melody, stop_length);
+            let mut v2 = pm_help(i2, melody, stop_length);
+            v1.append(&mut v2);
+            v1
+        } else {
+            let sub = ClosedInterval {
+                start: interval.start,
+                end: interval.end - 1,
+            };
+            let mut v = pm_help(sub, melody, stop_length);
+            v.last_mut().unwrap().end += 1;
+            v
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub struct ClosedInterval {
+    start: usize,
+    end: usize,
+}
+
+impl ClosedInterval {
+    pub fn indices<T>(v: &Vec<T>) -> Self {
+        Self {
+            start: 0,
+            end: v.len() - 1,
+        }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = usize> {
+        self.start..=self.end
+    }
+
+    pub fn new(start: usize, end: usize) -> Self {
+        Self { start, end }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.start > self.end
+    }
+
+    pub fn len(&self) -> usize {
+        if self.is_empty() {
+            0
+        } else {
+            self.end - self.start + 1
+        }
+    }
+
+    pub fn contains(&self, i: usize) -> bool {
+        self.start <= i && i <= self.end
+    }
+
+    pub fn divided(&self, division_end: usize) -> (Self, Self) {
+        assert!(self.start <= division_end && division_end < self.end);
+        (
+            Self {
+                start: self.start,
+                end: division_end,
+            },
+            Self {
+                start: division_end + 1,
+                end: self.end,
+            },
+        )
+    }
 }
 
 #[cfg(test)]

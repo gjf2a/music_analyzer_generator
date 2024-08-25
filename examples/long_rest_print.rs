@@ -1,5 +1,5 @@
 use midi_note_recorder::Recording;
-use music_analyzer_generator::durations_notes_from;
+use music_analyzer_generator::{durations_notes_from, partitioned_melody};
 
 const MIN_LONG: f64 = 0.3;
 
@@ -20,6 +20,32 @@ fn main() -> anyhow::Result<()> {
             println!();
         }
     }
+
+    println!();
+    println!();
+    println!();
+
+    let c = consolidated_times(&durations_notes);
+    println!("num consolidated: {}", c.len());
+
+    for (d, n, v) in c.iter() {
+        println!("{d:.2}\t{n}\t{v}");
+        if *v == 0 && *d > MIN_LONG {
+            println!();
+        }
+    }
+
+    println!();
+    println!();
+    println!("Partitioned");
+    let p = partitioned_melody(&c, 3);
+    for interval in p.iter() {
+        for i in interval.iter() {
+            println!("{:.2}\t{}\t{}", c[i].0, c[i].1, c[i].2);
+        }
+        println!();
+    }
+
     Ok(())
 }
 
@@ -40,4 +66,17 @@ fn median_rest_time(durations_notes: &Vec<(f64, u8, u8)>) -> f64 {
 fn mean_rest_time(durations_notes: &Vec<(f64, u8, u8)>) -> f64 {
     let rt = rest_times(durations_notes);
     rt.iter().sum::<f64>() / rt.len() as f64
+}
+
+fn consolidated_times(durations_notes: &Vec<(f64, u8, u8)>) -> Vec<(f64, u8, u8)> {
+    (0..durations_notes.len())
+        .step_by(2)
+        .map(|i| {
+            (
+                durations_notes[i].0 + durations_notes[i + 1].0,
+                durations_notes[i].1,
+                durations_notes[i].2,
+            )
+        })
+        .collect()
 }
