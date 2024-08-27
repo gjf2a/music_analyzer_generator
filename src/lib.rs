@@ -78,7 +78,8 @@ impl Accidental {
     pub fn symbol(&self) -> char {
         match self {
             Accidental::Flat => '\u{266d}',
-            Accidental::Natural => '\u{266e}',
+            //Accidental::Natural => '\u{266e}',
+            Accidental::Natural => ' ',
             Accidental::Sharp => '\u{266f}',
         }
     }
@@ -104,6 +105,25 @@ impl Accidental {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct NoteName {
+    letter: NoteLetter,
+    modifier: Accidental,
+}
+
+impl NoteName {
+    pub fn name_of(pitch: u8) -> Self {
+        let (letter, modifier) = MAJOR_ROOT_IDS[(pitch % 12) as usize];
+        Self { letter, modifier }
+    }
+}
+
+impl Display for NoteName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}{}", self.letter, self.modifier.symbol(),)
+    }
+}
+
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct Chord {
     name: ChordName,
@@ -118,15 +138,6 @@ impl Display for Chord {
             self.name,
             self.notes.iter().collect::<Vec<_>>()
         )
-    }
-}
-
-impl Chord {
-    pub fn chords_from(recording: &Recording) -> Vec<(f64, Self)> {
-        ActivePitches::pitch_sequence_from(recording)
-            .iter()
-            .filter_map(|(t, n)| ChordName::new(*n).map(|name| (*t, Self { name, notes: *n })))
-            .collect()
     }
 }
 
@@ -223,17 +234,6 @@ pub struct ActivePitches {
 }
 
 impl ActivePitches {
-    pub fn pitch_sequence_from(recording: &Recording) -> Vec<(f64, Self)> {
-        let mut current = Self::default();
-        let mut result = Vec::new();
-        let mut queue = recording.midi_queue();
-        while let Some((time, msg)) = queue.pop_front() {
-            current.update_from(&msg);
-            result.push((time, current));
-        }
-        result
-    }
-
     pub fn update_from(&mut self, msg: &MidiMsg) {
         if let Some((pitch, velocity)) = note_velocity_from(msg) {
             if velocity > 0 {
@@ -254,6 +254,30 @@ impl ActivePitches {
 
     pub fn iter(&self) -> impl Iterator<Item = u8> + '_ {
         (0..=127).filter(|p| self.on & (1 << p) > 0)
+    }
+}
+
+#[derive(Clone)]
+pub struct PitchSequence {
+    seq: Vec<(f64, MidiMsg, ActivePitches)>
+}
+
+impl PitchSequence {
+    pub fn from(recording: &Recording) -> Self {
+        let mut current = ActivePitches::default();
+        let mut seq = Vec::new();
+        let mut queue = recording.midi_queue();
+        while let Some((time, msg)) = queue.pop_front() {
+            current.update_from(&msg);
+            seq.push((time, msg.clone(), current));
+        }
+        Self {seq}
+    }
+
+    pub fn chords(&self) -> Vec<(f64, Chord)> {
+        self.seq.iter()
+            .filter_map(|(t, _, n)| ChordName::new(*n).map(|name| (*t, Chord { name, notes: *n })))
+            .collect()
     }
 }
 

@@ -1,5 +1,5 @@
 use midi_note_recorder::Recording;
-use music_analyzer_generator::{durations_notes_from, partitioned_melody};
+use music_analyzer_generator::{durations_notes_from, partitioned_melody, NoteName};
 
 fn main() -> anyhow::Result<()> {
     let args = std::env::args().collect::<Vec<_>>();
@@ -15,7 +15,13 @@ fn main() -> anyhow::Result<()> {
     let p = partitioned_melody(&c, 3);
     for interval in p.iter() {
         for i in interval.iter() {
-            println!("{:.2}\t{}\t{}", c[i].0, c[i].1, c[i].2);
+            println!(
+                "{:.2}\t{}\t{}\t{}",
+                c[i].0,
+                c[i].1,
+                NoteName::name_of(c[i].1),
+                c[i].2
+            );
         }
         println!();
     }
