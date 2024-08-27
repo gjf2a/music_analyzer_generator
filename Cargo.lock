@@ -119,8 +119,8 @@ dependencies = [
 
 [[package]]
 name = "midi_note_recorder"
-version = "0.1.1"
-source = "git+https://github.com/gjf2a/midi_note_recorder#431f781a093cc43db947f639af088aac9327205e"
+version = "0.1.2"
+source = "git+https://github.com/gjf2a/midi_note_recorder#558e429e7cab93394720b5184701260e87b20364"
 dependencies = [
  "anyhow",
  "crossbeam-queue",

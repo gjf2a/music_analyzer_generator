@@ -7,7 +7,7 @@ fn main() -> anyhow::Result<()> {
         println!("Usage: chord_print filename [-times]")
     }
     let recording: Recording = Recording::from_file(args[1].as_str())?;
-    for (time, chord) in PitchSequence::from(&recording).chords() {
+    for (time, chord) in PitchSequence::new(&recording).chords() {
         if args.contains(&"-times".to_string()) {
             print!("{time:.2}\t");
         }

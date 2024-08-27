@@ -257,25 +257,75 @@ impl ActivePitches {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct PitchSequence {
-    seq: Vec<(f64, MidiMsg, ActivePitches)>
+    seq: Vec<(f64, MidiMsg, ActivePitches)>,
 }
 
 impl PitchSequence {
-    pub fn from(recording: &Recording) -> Self {
+    pub fn new(recording: &Recording) -> Self {
         let mut current = ActivePitches::default();
-        let mut seq = Vec::new();
+        let mut result = Self::default();
         let mut queue = recording.midi_queue();
         while let Some((time, msg)) = queue.pop_front() {
-            current.update_from(&msg);
-            seq.push((time, msg.clone(), current));
+            result.push(time, &msg, &mut current);
         }
-        Self {seq}
+        result
+    }
+
+    fn push(&mut self, time: f64, msg: &MidiMsg, current: &mut ActivePitches) {
+        current.update_from(&msg);
+        self.seq.push((time, msg.clone(), *current));
+    }
+
+    pub fn recording(&self) -> Recording {
+        let mut result = Recording::default();
+        for (time, msg, _) in self.seq.iter() {
+            result.add_message(*time, msg);
+        }
+        result
+    }
+
+    pub fn without_notes_below(&self, min_duration: f64) -> Self {
+        let mut result = Self::default();
+        let mut current = ActivePitches::default();
+        for (i, (t, msg, _)) in self.seq.iter().enumerate() {
+            if self.keep_note_without_below(min_duration, i, current) {
+                result.push(*t, msg, &mut current);
+            }
+        }
+        result
+    }
+
+    fn keep_note_without_below(&self, min_duration: f64, i: usize, current: ActivePitches) -> bool {
+        if let Some((n, v)) = note_velocity_from(&self.seq[i].1) {
+            if v > 0 {
+                self.next_off_note_index(i)
+                    .map_or(true, |j| (self.seq[j].0 - self.seq[i].0) >= min_duration)
+            } else {
+                current.is_active(n)
+            }
+        } else {
+            true
+        }
+    }
+
+    fn next_off_note_index(&self, i: usize) -> Option<usize> {
+        if let Some((n, _)) = note_velocity_from(&self.seq[i].1) {
+            for j in (i + 1)..self.seq.len() {
+                if let Some((nj, vj)) = note_velocity_from(&self.seq[j].1) {
+                    if n == nj {
+                        return if vj == 0 { Some(j) } else { None };
+                    }
+                }
+            }
+        }
+        None
     }
 
     pub fn chords(&self) -> Vec<(f64, Chord)> {
-        self.seq.iter()
+        self.seq
+            .iter()
             .filter_map(|(t, _, n)| ChordName::new(*n).map(|name| (*t, Chord { name, notes: *n })))
             .collect()
     }
