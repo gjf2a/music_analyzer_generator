@@ -286,20 +286,20 @@ impl PitchSequence {
         result
     }
 
-    pub fn without_notes_below(&self, min_duration: f64) -> Self {
+    pub fn without_notes_below(&self, min_duration: f64, min_velocity: u8) -> Self {
         let mut result = Self::default();
         let mut current = ActivePitches::default();
         for (i, (t, msg, _)) in self.seq.iter().enumerate() {
-            if self.keep_note_without_below(min_duration, i, current) {
+            if self.keep_note_without_below(min_duration, min_velocity, i, current) {
                 result.push(*t, msg, &mut current);
             }
         }
         result
     }
 
-    fn keep_note_without_below(&self, min_duration: f64, i: usize, current: ActivePitches) -> bool {
+    fn keep_note_without_below(&self, min_duration: f64, min_velocity: u8, i: usize, current: ActivePitches) -> bool {
         if let Some((n, v)) = note_velocity_from(&self.seq[i].1) {
-            if v > 0 {
+            if v >= min_velocity {
                 self.next_off_note_index(i)
                     .map_or(true, |j| (self.seq[j].0 - self.seq[i].0) >= min_duration)
             } else {
