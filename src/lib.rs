@@ -515,7 +515,7 @@ mod tests {
     use midi_note_recorder::{midi_msg_from, Recording};
     use rand::Rng;
 
-    use crate::{ActivePitches, Chord};
+    use crate::{ActivePitches, PitchSequence};
 
     #[test]
     fn test_active_pitches() {
@@ -552,43 +552,43 @@ mod tests {
     #[test]
     fn test_chord_id() {
         let recording = Recording::from_file("healing4").unwrap();
-        let expected = "A♮ Major ([61, 64, 69])
-A♮ Major ([61, 64, 69])
-B♮ Major ([59, 63, 66])
+        let expected = "A  Major ([61, 64, 69])
+A  Major ([61, 64, 69])
+B  Major ([59, 63, 66])
 E♭ Minor ([58, 59, 63, 66])
-B♮ Major ([59, 63, 66])
-B♮ Major ([59, 63, 66])
-B♮ Major ([59, 63, 66])
-E♮ Major ([59, 64, 68])
-E♮ Major ([59, 64, 68])
+B  Major ([59, 63, 66])
+B  Major ([59, 63, 66])
+B  Major ([59, 63, 66])
+E  Major ([59, 64, 68])
+E  Major ([59, 64, 68])
 C♯ Minor ([61, 64, 68])
 C♯ Minor ([61, 64, 68])
 C♯ Minor ([61, 64, 68])
-A♮ Major ([61, 64, 69])
-A♮ Major ([61, 64, 69])
-B♮ Major ([59, 63, 66])
-B♮ Major ([59, 63, 66])
-E♮ Major ([59, 64, 68])
-E♮ Major ([59, 64, 68])
+A  Major ([61, 64, 69])
+A  Major ([61, 64, 69])
+B  Major ([59, 63, 66])
+B  Major ([59, 63, 66])
+E  Major ([59, 64, 68])
+E  Major ([59, 64, 68])
 C♯ Minor ([61, 64, 68])
 C♯ Minor ([61, 64, 68])
 C♯ Minor ([61, 64, 68])
-A♮ Major ([61, 64, 69])
-A♮ Major ([61, 64, 69])
-B♮ Major ([59, 63, 66])
-B♮ Major ([59, 63, 66])
-B♮ Major ([59, 63, 66])
-E♮ Major ([59, 64, 68])
-E♮ Major ([59, 64, 68])
+A  Major ([61, 64, 69])
+A  Major ([61, 64, 69])
+B  Major ([59, 63, 66])
+B  Major ([59, 63, 66])
+B  Major ([59, 63, 66])
+E  Major ([59, 64, 68])
+E  Major ([59, 64, 68])
 C♯ Minor ([61, 64, 68])
 C♯ Minor ([61, 64, 68])
 C♯ Minor ([61, 64, 68])
-A♮ Major ([57, 61, 64])
-B♮ Major ([59, 63, 66])
+A  Major ([57, 61, 64])
+B  Major ([59, 63, 66])
 E♭ Diminished ([57, 59, 63, 66])
-B♮ Major ([59, 63, 66])
-B♮ Major ([59, 63, 66])";
-        let chords = Chord::chords_from(&recording);
+B  Major ([59, 63, 66])
+B  Major ([59, 63, 66])";
+        let chords = PitchSequence::new(&recording).chords();
         for (i, chord_str) in expected.lines().enumerate() {
             assert_eq!(format!("{}", chords[i].1), chord_str);
         }
