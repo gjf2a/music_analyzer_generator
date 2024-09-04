@@ -1,5 +1,5 @@
 use midi_note_recorder::Recording;
-use music_analyzer_generator::{consolidated_times, durations_notes_from, partitioned_melody, NoteName};
+use music_analyzer_generator::{consolidated_times, duration_clusters, durations_notes_from};
 
 fn main() -> anyhow::Result<()> {
     let args = std::env::args().collect::<Vec<_>>();
@@ -12,20 +12,11 @@ fn main() -> anyhow::Result<()> {
     let c = consolidated_times(&durations_notes);
     println!("num consolidated: {}", c.len());
 
-    let p = partitioned_melody(&c, 3);
-    for interval in p.iter() {
-        for i in interval.iter() {
-            println!(
-                "{:.2}\t{}\t{}\t{}",
-                c[i].0,
-                c[i].1,
-                NoteName::name_of(c[i].1),
-                c[i].2
-            );
-        }
-        println!();
+    let dc = duration_clusters(&c, 3);
+    for cl in dc {
+        println!("{cl:?}");
     }
-
+    
     Ok(())
 }
 

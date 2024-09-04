@@ -454,6 +454,28 @@ fn pm_help(
     }
 }
 
+pub fn duration_clusters(melody: &Vec<(f64, u8, u8)>, stop_length: usize) -> Vec<Vec<f64>> {
+    let partitioned = partitioned_melody(melody, stop_length);
+    let mut result = vec![];
+    for interval in partitioned.iter() {
+        result.push(interval.iter().map(|i| melody[i].0).collect());
+    }
+    result
+}
+
+pub fn consolidated_times(durations_notes: &Vec<(f64, u8, u8)>) -> Vec<(f64, u8, u8)> {
+    (0..durations_notes.len())
+        .step_by(2)
+        .map(|i| {
+            (
+                durations_notes[i].0 + durations_notes[i + 1].0,
+                durations_notes[i].1,
+                durations_notes[i].2,
+            )
+        })
+        .collect()
+}
+
 #[derive(Copy, Clone, Debug, Default)]
 pub struct ClosedInterval {
     start: usize,
