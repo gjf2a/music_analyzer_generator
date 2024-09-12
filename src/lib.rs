@@ -118,7 +118,9 @@ impl NoteName {
     }
 
     pub fn lowest_midi_note(&self) -> u8 {
-        self.modifier.pitch_shift(self.letter.natural_pitch()).unwrap()
+        self.modifier
+            .pitch_shift(self.letter.natural_pitch())
+            .unwrap()
     }
 }
 
@@ -183,6 +185,7 @@ pub enum ScaleMode {
     HarmonicMinor,
     MelodicMinor,
     Diminished,
+    Augmented,
 }
 
 impl ScaleMode {
@@ -197,8 +200,18 @@ impl ScaleMode {
             ScaleMode::Locrian => ScalePattern::mode_rotation(6),
             ScaleMode::HarmonicMinor => ScalePattern::standard([2, 1, 2, 2, 1, 3, 1]),
             ScaleMode::MelodicMinor => ScalePattern::standard([2, 1, 2, 2, 2, 2, 1]),
-            ScaleMode::WholeTone => ScalePattern {num_jumps: 6, jumps: [2, 2, 2, 2, 2, 2, 0, 0]},
-            ScaleMode::Diminished => ScalePattern {num_jumps: 8, jumps: [2, 1, 2, 1, 2, 1, 2, 1]},
+            ScaleMode::WholeTone => ScalePattern {
+                num_jumps: 6,
+                jumps: [2, 2, 2, 2, 2, 2, 0, 0],
+            },
+            ScaleMode::Diminished => ScalePattern {
+                num_jumps: 8,
+                jumps: [2, 1, 2, 1, 2, 1, 2, 1],
+            },
+            ScaleMode::Augmented => ScalePattern {
+                num_jumps: 6,
+                jumps: [3, 1, 3, 1, 3, 1, 0, 0],
+            },
         }
     }
 
@@ -206,28 +219,39 @@ impl ScaleMode {
         match self {
             ScaleMode::MelodicMinor => ScalePattern::mode_rotation(5),
             _ => self.pattern_up(),
-        }.reversed()
+        }
+        .reversed()
     }
 
-    pub fn notes_going_up(&self, root: NoteName) -> impl Iterator<Item=u8> {
-        ScaleUpIterator {pattern: self.pattern_up(), current: root.lowest_midi_note(), count: 0}
+    pub fn notes_going_up(&self, root: NoteName) -> impl Iterator<Item = u8> {
+        ScaleUpIterator {
+            pattern: self.pattern_up(),
+            current: root.lowest_midi_note(),
+            count: 0,
+        }
     }
 
-    pub fn notes_going_down(&self, root: NoteName) -> impl Iterator<Item=u8> {
+    pub fn notes_going_down(&self, root: NoteName) -> impl Iterator<Item = u8> {
         let root_note = root.lowest_midi_note();
         ScaleDownIterator {
             pattern: self.pattern_down(),
-            current: root_note + if root_note > 7 {108} else {120},
-            count: 0
+            current: root_note + if root_note > 7 { 108 } else { 120 },
+            count: 0,
         }
     }
 
     pub fn note_up(&self, root: NoteName, current: u8, interval: usize) -> Option<u8> {
-        self.notes_going_up(root).skip_while(|n| *n < current).skip(interval - 1).next()
+        self.notes_going_up(root)
+            .skip_while(|n| *n < current)
+            .skip(interval - 1)
+            .next()
     }
 
     pub fn note_down(&self, root: NoteName, current: u8, interval: usize) -> Option<u8> {
-        self.notes_going_down(root).skip_while(|n| *n > current).skip(interval - 1).next()
+        self.notes_going_down(root)
+            .skip_while(|n| *n > current)
+            .skip(interval - 1)
+            .next()
     }
 }
 
@@ -297,7 +321,10 @@ impl ScalePattern {
         for (i, j) in intervals.iter().enumerate() {
             jumps[i] = *j;
         }
-        Self {num_jumps: 7, jumps}
+        Self {
+            num_jumps: 7,
+            jumps,
+        }
     }
 
     fn mode_rotation(rotation: usize) -> Self {
@@ -372,6 +399,23 @@ pub enum ChordMode {
     Augmented,
 }
 
+impl ChordMode {
+    pub fn scales(&self) -> Vec<ScaleMode> {
+        match self {
+            ChordMode::Major => vec![ScaleMode::Major, ScaleMode::Lydian, ScaleMode::Mixolydian],
+            ChordMode::Minor => vec![
+                ScaleMode::Minor,
+                ScaleMode::MelodicMinor,
+                ScaleMode::HarmonicMinor,
+                ScaleMode::Dorian,
+                ScaleMode::Phrygian,
+            ],
+            ChordMode::Diminished => vec![ScaleMode::Diminished],
+            ChordMode::Augmented => vec![ScaleMode::Augmented, ScaleMode::WholeTone],
+        }
+    }
+}
+
 #[derive(Copy, Clone, Default, Eq, PartialEq)]
 pub struct ActivePitches {
     on: u128,
@@ -441,7 +485,13 @@ impl PitchSequence {
         result
     }
 
-    fn keep_note_without_below(&self, min_duration: f64, min_velocity: u8, i: usize, current: ActivePitches) -> bool {
+    fn keep_note_without_below(
+        &self,
+        min_duration: f64,
+        min_velocity: u8,
+        i: usize,
+        current: ActivePitches,
+    ) -> bool {
         if let Some((n, v)) = note_velocity_from(&self.seq[i].1) {
             if v >= min_velocity {
                 self.next_off_note_index(i)
@@ -685,21 +735,46 @@ mod tests {
 
     #[test]
     fn test_ascending_scale() {
-        let c_notes = ScaleMode::Major.notes_going_up(NoteName {letter: NoteLetter::C, modifier: Accidental::Natural}).collect::<Vec<_>>();
-        assert_eq!(c_notes[..15], vec![0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17, 19, 21, 23, 24]);
+        let c_notes = ScaleMode::Major
+            .notes_going_up(NoteName {
+                letter: NoteLetter::C,
+                modifier: Accidental::Natural,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            c_notes[..15],
+            vec![0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17, 19, 21, 23, 24]
+        );
     }
 
     #[test]
     fn test_descending_scale() {
-        let c_notes = ScaleMode::Major.notes_going_down(NoteName {letter: NoteLetter::C, modifier: Accidental::Natural}).collect::<Vec<_>>();
-        assert_eq!(c_notes[..15], vec![120, 119, 117, 115, 113, 112, 110, 108, 107, 105, 103, 101, 100, 98, 96]);
+        let c_notes = ScaleMode::Major
+            .notes_going_down(NoteName {
+                letter: NoteLetter::C,
+                modifier: Accidental::Natural,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            c_notes[..15],
+            vec![120, 119, 117, 115, 113, 112, 110, 108, 107, 105, 103, 101, 100, 98, 96]
+        );
     }
 
     #[test]
     fn test_note_up() {
-        let root1 = NoteName {letter: NoteLetter::C, modifier: Accidental::Natural};
-        let root2 = NoteName {letter: NoteLetter::F, modifier: Accidental::Sharp};
-        let root3 = NoteName {letter: NoteLetter::B, modifier: Accidental::Flat};
+        let root1 = NoteName {
+            letter: NoteLetter::C,
+            modifier: Accidental::Natural,
+        };
+        let root2 = NoteName {
+            letter: NoteLetter::F,
+            modifier: Accidental::Sharp,
+        };
+        let root3 = NoteName {
+            letter: NoteLetter::B,
+            modifier: Accidental::Flat,
+        };
         for (root, mode, current, interval, expected) in [
             (root1, ScaleMode::Major, 60, 3, 64),
             (root1, ScaleMode::Minor, 60, 3, 63),
@@ -714,9 +789,18 @@ mod tests {
 
     #[test]
     fn test_note_down() {
-        let root1 = NoteName {letter: NoteLetter::C, modifier: Accidental::Natural};
-        let root2 = NoteName {letter: NoteLetter::F, modifier: Accidental::Sharp};
-        let root3 = NoteName {letter: NoteLetter::B, modifier: Accidental::Flat};
+        let root1 = NoteName {
+            letter: NoteLetter::C,
+            modifier: Accidental::Natural,
+        };
+        let root2 = NoteName {
+            letter: NoteLetter::F,
+            modifier: Accidental::Sharp,
+        };
+        let root3 = NoteName {
+            letter: NoteLetter::B,
+            modifier: Accidental::Flat,
+        };
         for (root, mode, current, interval, expected) in [
             (root1, ScaleMode::Major, 60, 3, 57),
             (root1, ScaleMode::Minor, 60, 3, 56),

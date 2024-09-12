@@ -16,8 +16,6 @@ fn main() -> anyhow::Result<()> {
     for cl in dc {
         println!("{cl:?}");
     }
-    
+
     Ok(())
 }
-
-

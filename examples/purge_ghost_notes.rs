@@ -4,7 +4,9 @@ use music_analyzer_generator::PitchSequence;
 fn main() -> anyhow::Result<()> {
     let args = std::env::args().collect::<Vec<_>>();
     if args.len() < 5 {
-        println!("Usage: duration_print input_filename min_note_duration min_velocity output_filename")
+        println!(
+            "Usage: duration_print input_filename min_note_duration min_velocity output_filename"
+        )
     }
     let input_filename = args[1].as_str();
     let min_duration = args[2].parse::<f64>()?;

@@ -1,5 +1,7 @@
 use midi_note_recorder::Recording;
-use music_analyzer_generator::{consolidated_times, durations_notes_from, partitioned_melody, NoteName};
+use music_analyzer_generator::{
+    consolidated_times, durations_notes_from, partitioned_melody, NoteName,
+};
 
 fn main() -> anyhow::Result<()> {
     let args = std::env::args().collect::<Vec<_>>();
@@ -28,5 +30,3 @@ fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
-
-
