@@ -4,7 +4,7 @@ use music_analyzer_generator::{consolidated_times, duration_clusters, durations_
 fn main() -> anyhow::Result<()> {
     let args = std::env::args().collect::<Vec<_>>();
     if args.len() < 2 {
-        println!("Usage: duration_print filename")
+        println!("Usage: duration_print filename [-debug]")
     }
     let recording: Recording = Recording::from_file(args[1].as_str())?;
     let durations_notes = durations_notes_from(&recording);
@@ -13,8 +13,12 @@ fn main() -> anyhow::Result<()> {
     println!("num consolidated: {}", c.len());
 
     let dc = duration_clusters(&c, 3);
-    for cl in dc {
-        println!("{cl:?}");
+    if args.contains(&"-debug".to_string()) {
+        println!("{dc:?}");
+    } else {
+        for cl in dc {
+            println!("{cl:?}");
+        }
     }
 
     Ok(())

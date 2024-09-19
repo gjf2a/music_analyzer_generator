@@ -1,3 +1,5 @@
+pub mod generator;
+
 use std::{collections::VecDeque, fmt::Display};
 
 use enum_iterator::Sequence;
@@ -130,7 +132,7 @@ impl Display for NoteName {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Chord {
     name: ChordName,
     notes: ActivePitches,
@@ -416,7 +418,7 @@ impl ChordMode {
     }
 }
 
-#[derive(Copy, Clone, Default, Eq, PartialEq)]
+#[derive(Copy, Clone, Default, Eq, PartialEq, Debug)]
 pub struct ActivePitches {
     on: u128,
 }
