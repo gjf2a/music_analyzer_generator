@@ -522,18 +522,18 @@ impl PitchSequence {
     pub fn chords_starts_durations(&self) -> Vec<(Chord, f64, f64)> {
         let mut pending = None;
         let mut result = vec![];
-        let mut last_t = 0.0;
+        let mut last_time = 0.0;
         for (t, _, p) in self.seq.iter() {
             if let Some(name) = ChordName::new(*p) {
                 if let Some((chord, time)) = pending {
                     result.push((chord, time, *t - time));
+                    last_time = time;
                 }
                 pending = Some((Chord { name, notes: *p }, *t));
-                last_t = *t;
             }
         }
         if let Some((chord, time)) = pending {
-            result.push((chord, time, last_t - time));
+            result.push((chord, time, time - last_time));
         }
         result
     }
