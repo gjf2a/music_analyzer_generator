@@ -519,11 +519,23 @@ impl PitchSequence {
         None
     }
 
-    pub fn chords(&self) -> Vec<(f64, Chord)> {
-        self.seq
-            .iter()
-            .filter_map(|(t, _, n)| ChordName::new(*n).map(|name| (*t, Chord { name, notes: *n })))
-            .collect()
+    pub fn chords_starts_durations(&self) -> Vec<(Chord, f64, f64)> {
+        let mut pending = None;
+        let mut result = vec![];
+        let mut last_t = 0.0;
+        for (t, _, p) in self.seq.iter() {
+            if let Some(name) = ChordName::new(*p) {
+                if let Some((chord, time)) = pending {
+                    result.push((chord, time, *t - time));
+                }
+                pending = Some((Chord { name, notes: *p }, *t));
+                last_t = *t;
+            }
+        }
+        if let Some((chord, time)) = pending {
+            result.push((chord, time, last_t - time));
+        }
+        result
     }
 }
 
@@ -886,7 +898,7 @@ B  Major ([59, 63, 66])
 E♭ Diminished ([57, 59, 63, 66])
 B  Major ([59, 63, 66])
 B  Major ([59, 63, 66])";
-        let chords = PitchSequence::new(&recording).chords();
+        let chords = PitchSequence::new(&recording).chords_starts_durations();
         for (i, chord_str) in expected.lines().enumerate() {
             assert_eq!(format!("{}", chords[i].1), chord_str);
         }
