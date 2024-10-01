@@ -671,7 +671,7 @@ pub fn duration_clusters(melody: &Vec<(f64, u8, u8)>, stop_length: usize) -> Vec
     result
 }
 
-pub fn consolidated_times(durations_notes: &Vec<(f64, u8, u8)>) -> Vec<(f64, u8, u8)> {
+pub fn consolidated_note_rest_times(durations_notes: &Vec<(f64, u8, u8)>) -> Vec<(f64, u8, u8)> {
     (0..durations_notes.len())
         .step_by(2)
         .map(|i| {

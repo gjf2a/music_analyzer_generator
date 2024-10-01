@@ -30,13 +30,13 @@ pub fn random_durations_from(
     result
 }
 
-pub fn random_melody_from<F:Fn(Chord)->MidiMsg>(notarizer: F, chords: &Vec<(Chord, f64, f64)>, duration_candidates: &Vec<Vec<f64>>) -> Vec<(f64, MidiMsg)> {
+pub fn random_melody_from<F:Fn(Chord, &Vec<(f64, MidiMsg)>)->MidiMsg>(notarizer: F, chords: &Vec<(Chord, f64, f64)>, duration_candidates: &Vec<Vec<f64>>) -> Vec<(f64, MidiMsg)> {
     let durations = random_durations_from(chords, duration_candidates);
     let mut result = vec![];
     let mut time = 0.0;
     let mut chord_index = 0;
     for duration in durations {
-        result.push((time, notarizer(chords[chord_index].0)));
+        result.push((time, notarizer(chords[chord_index].0, &result)));
         time += duration;
         if chord_index + 1 < chords.len() && time > chords[chord_index + 1].1 {
             chord_index += 1;
@@ -46,9 +46,9 @@ pub fn random_melody_from<F:Fn(Chord)->MidiMsg>(notarizer: F, chords: &Vec<(Chor
 }
 
 pub fn random_chord_note_melody(chords: &Vec<(Chord, f64, f64)>, duration_candidates: &Vec<Vec<f64>>) -> Vec<(f64, MidiMsg)> {
-    random_melody_from(|chord| {
+    random_melody_from(|chord, _| {
         let mut rng = thread_rng();
-        let note_candidates = chord.notes.iter().collect::<Vec<_>>();
+        let note_candidates = chord.notes.iter().map(|n| n + 12).collect::<Vec<_>>();
         let note = *note_candidates.choose(&mut rng).unwrap();
         midi_msg_from(midi_msg::Channel::Ch1, note, 127)
     }, chords, duration_candidates)

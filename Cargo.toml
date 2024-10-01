@@ -11,3 +11,5 @@ rand = "0.8"
 
 [dev-dependencies]
 anyhow = "1"
+midi_fundsp = "0.5.3"
+crossbeam-queue = "0.3"

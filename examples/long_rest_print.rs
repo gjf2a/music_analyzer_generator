@@ -1,6 +1,6 @@
 use midi_note_recorder::Recording;
 use music_analyzer_generator::{
-    consolidated_times, durations_notes_from, partitioned_melody, NoteName,
+    consolidated_note_rest_times, durations_notes_from, partitioned_melody, NoteName,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -11,7 +11,7 @@ fn main() -> anyhow::Result<()> {
     let recording: Recording = Recording::from_file(args[1].as_str())?;
     let durations_notes = durations_notes_from(&recording);
 
-    let c = consolidated_times(&durations_notes);
+    let c = consolidated_note_rest_times(&durations_notes);
     println!("num consolidated: {}", c.len());
 
     let p = partitioned_melody(&c, 3);
