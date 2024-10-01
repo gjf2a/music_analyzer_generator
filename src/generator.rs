@@ -1,7 +1,9 @@
 use crate::Chord;
+use midi_msg::MidiMsg;
+use midi_note_recorder::midi_msg_from;
 use rand::prelude::*;
 
-pub fn make_durations_from(
+pub fn random_durations_from(
     chords: &Vec<(Chord, f64, f64)>,
     duration_candidates: &Vec<Vec<f64>>,
 ) -> Vec<f64> {
@@ -28,13 +30,37 @@ pub fn make_durations_from(
     result
 }
 
-pub fn make_melody_from(chords: Vec<(f64, Chord)>, durations: Vec<Vec<f64>>) -> Vec<(f64, u8, u8)> {
-    todo!("Not even started")
+pub fn random_melody_from<F:Fn(Chord)->MidiMsg>(notarizer: F, chords: &Vec<(Chord, f64, f64)>, duration_candidates: &Vec<Vec<f64>>) -> Vec<(f64, MidiMsg)> {
+    let durations = random_durations_from(chords, duration_candidates);
+    let mut result = vec![];
+    let mut time = 0.0;
+    let mut chord_index = 0;
+    for duration in durations {
+        result.push((time, notarizer(chords[chord_index].0)));
+        time += duration;
+        if chord_index + 1 < chords.len() && time > chords[chord_index + 1].1 {
+            chord_index += 1;
+        }
+    }
+    result
+}
+
+pub fn random_chord_note_melody(chords: &Vec<(Chord, f64, f64)>, duration_candidates: &Vec<Vec<f64>>) -> Vec<(f64, MidiMsg)> {
+    random_melody_from(|chord| {
+        let mut rng = thread_rng();
+        let note_candidates = chord.notes.iter().collect::<Vec<_>>();
+        let note = *note_candidates.choose(&mut rng).unwrap();
+        midi_msg_from(midi_msg::Channel::Ch1, note, 127)
+    }, chords, duration_candidates)
+}
+
+pub fn current_chord(chords: &Vec<(Chord, f64, f64)>, timestep: f64) -> Option<Chord> {
+    chords.iter().take_while(|(_, t, _)| *t < timestep).last().map(|(c,_,_)| *c)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::generator::make_durations_from;
+    use crate::generator::random_durations_from;
 
     #[test]
     fn test_make_durations() {
@@ -590,11 +616,11 @@ mod tests {
         ]
         .to_vec();
 
-        let result = make_durations_from(&chords, &durations);
-        println!("{result:?}");
-        // TODO: Write an assertion to test that:
-        // * The sum of the result is less than the time plus duration of the last chord
-        //   * Note: We don't represent when the last chord ends!
-        // * That same sum is within the smallest total duration of the chord durations.
+        for _ in 0..20 {
+            let result = random_durations_from(&chords, &durations);
+            let chord_duration_sum = chords.iter().map(|(_,_,d)| *d).sum::<f64>();
+            let result_sum = result.iter().sum::<f64>();
+            assert!(result_sum <= chord_duration_sum);
+        }
     }
 }
