@@ -54,10 +54,6 @@ pub fn random_chord_note_melody(chords: &Vec<(Chord, f64, f64)>, duration_candid
     }, chords, duration_candidates)
 }
 
-pub fn current_chord(chords: &Vec<(Chord, f64, f64)>, timestep: f64) -> Option<Chord> {
-    chords.iter().take_while(|(_, t, _)| *t < timestep).last().map(|(c,_,_)| *c)
-}
-
 #[cfg(test)]
 mod tests {
     use crate::generator::random_durations_from;
