@@ -1,6 +1,6 @@
 use crate::Chord;
 use midi_msg::MidiMsg;
-use midi_note_recorder::midi_msg_from;
+use midi_note_recorder::{midi_msg_from, note_velocity_from};
 use rand::prelude::*;
 
 pub fn random_durations_from(
@@ -36,6 +36,12 @@ pub fn random_melody_from<F:Fn(Chord, &Vec<(f64, MidiMsg)>)->MidiMsg>(notarizer:
     let mut time = 0.0;
     let mut chord_index = 0;
     for duration in durations {
+        if let Some((_, prev_msg)) = result.last() {
+            if let Some((note, _)) = note_velocity_from(prev_msg) {
+                result.push((time, midi_msg_from(midi_msg::Channel::Ch1, note, 0)));
+                time += 0.0001;
+            }
+        }
         result.push((time, notarizer(chords[chord_index].0, &result)));
         time += duration;
         if chord_index + 1 < chords.len() && time > chords[chord_index + 1].1 {
