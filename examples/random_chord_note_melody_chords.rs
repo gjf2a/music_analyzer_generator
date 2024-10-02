@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use midi_note_recorder::Recording;
+use midi_note_recorder::{Recording, stereo_playback};
 use music_analyzer_generator::{consolidated_note_rest_times, duration_clusters, durations_notes_from, generator::random_chord_note_melody, PitchSequence};
 
 use crossbeam_queue::SegQueue;
@@ -27,11 +27,10 @@ fn main() -> anyhow::Result<()> {
     let outgoing = Arc::new(SegQueue::new());
     let program_table = Arc::new(Mutex::new(options()));
     start_output_thread::<10>(outgoing.clone(), program_table.clone());
-    outgoing.push(SynthMsg::program_change(1, Speaker::Both));
-    melody_recording.playback_loop(None, outgoing, |msg| SynthMsg {
-        msg,
-        speaker: Speaker::Both,
-    });
+    outgoing.push(SynthMsg::program_change(1, Speaker::Left));
+    outgoing.push(SynthMsg::program_change(13, Speaker::Right));
+
+    stereo_playback(&recording, &melody_recording, outgoing, |msg| SynthMsg { msg, speaker: Speaker::Left }, |msg| SynthMsg { msg, speaker: Speaker::Right });
 
     Ok(())
 }

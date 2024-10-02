@@ -144,9 +144,9 @@ checksum = "428d9aa8fbc0670b7b8d6030a7fadd0f86151cae55e4dbbece15f3780a3dfaf3"
 
 [[package]]
 name = "cc"
-version = "1.1.23"
+version = "1.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3bbb537bb4a30b90362caddba8f360c0a56bc13d3a5570028e7197204cb54a17"
+checksum = "812acba72f0a070b003d3697490d2b55b837230ae7c6c6497f05cc2ddbb8d938"
 dependencies = [
  "jobserver",
  "libc",
@@ -342,7 +342,7 @@ checksum = "62d5e805ba4f6d7d7c4124e35602b35d5e8448916deae715eda946244eb99f78"
 dependencies = [
  "dyn-clone",
  "funutd",
- "hashbrown",
+ "hashbrown 0.14.5",
  "libm",
  "microfft",
  "num-complex",
@@ -361,7 +361,7 @@ checksum = "30f658de1fbeca3b70faf090e33d1ecf32b0efd1805bede4a8fd6ef562b7ab83"
 dependencies = [
  "dyn-clone",
  "glam",
- "hashbrown",
+ "hashbrown 0.14.5",
  "libm",
 ]
 
@@ -411,6 +411,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashbrown"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e087f84d4f86bf4b218b927129862374b72199ae7d8657835f1e89000eea4fb"
+
+[[package]]
 name = "heck"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -418,12 +424,12 @@ checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
 name = "indexmap"
-version = "2.5.0"
+version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68b900aa2f7301e21c36462b170ee99994de34dff39a4a6a528e80e7376d07e5"
+checksum = "707907fe3c25f5424cce2cb7e1cbcafee6bdbe735ca90ef77c29e84591e5b9da"
 dependencies = [
  "equivalent",
- "hashbrown",
+ "hashbrown 0.15.0",
 ]
 
 [[package]]
@@ -581,8 +587,8 @@ dependencies = [
 
 [[package]]
 name = "midi_note_recorder"
-version = "0.1.4"
-source = "git+https://github.com/gjf2a/midi_note_recorder#89096c50ae9a23afa4ccfec66c632982b509813c"
+version = "0.1.5"
+source = "git+https://github.com/gjf2a/midi_note_recorder#c5a9bd79a7452aca700e13b4caf7798c62219b9d"
 dependencies = [
  "anyhow",
  "crossbeam-queue",
