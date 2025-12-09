@@ -829,12 +829,12 @@ mod tests {
 
     #[test]
     fn test_active_pitches() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut active = ActivePitches::default();
         let mut active_tester = BTreeSet::new();
         for _ in 0..100 {
-            if active.len() == 0 || rng.gen_bool(0.5) {
-                let note = rng.gen_range(0..=127);
+            if active.len() == 0 || rng.random_bool(0.5) {
+                let note = rng.random_range(0..=127);
                 let already = active.is_active(note);
                 let msg = midi_msg_from(Channel::Ch1, note, 1);
                 let prev_len = active.len();
@@ -846,7 +846,7 @@ mod tests {
                 active_tester.insert(note);
             } else {
                 let pitches = active.iter().collect::<Vec<_>>();
-                let remove = pitches[rng.gen_range(0..pitches.len())];
+                let remove = pitches[rng.random_range(0..pitches.len())];
                 let msg = midi_msg_from(Channel::Ch1, remove, 0);
                 let prev_len = active.len();
                 active.update_from(&msg);
@@ -900,7 +900,7 @@ B  Major ([59, 63, 66])
 B  Major ([59, 63, 66])";
         let chords = PitchSequence::new(&recording).chords_starts_durations();
         for (i, chord_str) in expected.lines().enumerate() {
-            assert_eq!(format!("{}", chords[i].1), chord_str);
+            assert_eq!(format!("{}", chords[i].0), chord_str);
         }
     }
 }

@@ -12,11 +12,14 @@ use midi_fundsp::{
 fn main() -> anyhow::Result<()> {
     let args = std::env::args().collect::<Vec<_>>();
     if args.len() < 2 {
-        println!("Usage: duration_print filename [-debug]")
+        println!("Usage: random_chord_note_melody filename")
     }
     let recording = Recording::from_file(args[1].as_str())?;
+    println!("Read in recording");
+    println!("{recording:?}");
     let chords = PitchSequence::new(&recording).chords_starts_durations();
-    
+    println!("{chords:?}");
+
     let durations_notes = durations_notes_from(&recording);
     let c = consolidated_note_rest_times(&durations_notes);
     let dc = duration_clusters(&c, 3);
