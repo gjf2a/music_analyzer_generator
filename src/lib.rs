@@ -748,6 +748,27 @@ mod tests {
     use crate::{Accidental, ActivePitches, NoteLetter, NoteName, PitchSequence, ScaleMode};
 
     #[test]
+    fn test_note_names() {
+        let note_name = [
+            (60, NoteLetter::C, Accidental::Natural),
+            (61, NoteLetter::D, Accidental::Flat),
+            (62, NoteLetter::D, Accidental::Natural),
+            (63, NoteLetter::E, Accidental::Flat),
+            (64, NoteLetter::E, Accidental::Natural),
+            (65, NoteLetter::F, Accidental::Natural),
+            (66, NoteLetter::F, Accidental::Sharp),
+            (67, NoteLetter::G, Accidental::Natural),
+            (68, NoteLetter::A, Accidental::Flat),
+            (69, NoteLetter::A, Accidental::Natural),
+            (70, NoteLetter::B, Accidental::Flat),
+            (71, NoteLetter::B, Accidental::Natural),
+        ];
+        for (pitch, letter, modifier) in note_name {
+            assert_eq!(NoteName::name_of(pitch), NoteName {letter, modifier});
+        }
+    }
+
+    #[test]
     fn test_ascending_scale() {
         let c_notes = ScaleMode::Major
             .notes_going_up(NoteName {
