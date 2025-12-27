@@ -138,6 +138,12 @@ pub struct Chord {
     notes: ActivePitches,
 }
 
+impl Chord {
+    pub fn name(&self) -> ChordName {
+        self.name
+    }
+}
+
 impl Display for Chord {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
