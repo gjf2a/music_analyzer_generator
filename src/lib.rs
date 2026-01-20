@@ -184,8 +184,8 @@ impl ChordName {
         let note_letter = base_note_letter.trim();
         match self.mode {
             ChordMode::Major => note_letter.to_owned(),
-            ChordMode::Minor => note_letter.to_lowercase(),
-            ChordMode::Diminished => format!("{}\u{00b0}", note_letter.to_lowercase()),
+            ChordMode::Minor => format!("{note_letter}m"),
+            ChordMode::Diminished => format!("{note_letter}\u{00b0}"),
             ChordMode::Augmented => format!("{note_letter}+"),
         }
     }
@@ -948,9 +948,9 @@ B  Major ([59, 63, 66])";
     fn test_chord_compact() {
         let recording = Recording::from_file("healing4").unwrap();
         let expected = [
-            "A", "A", "B", "e♭", "B", "B", "B", "E", "E", "c♯", "c♯", "c♯", "A", "A", "B", "B",
-            "E", "E", "c♯", "c♯", "c♯", "A", "A", "B", "B", "B", "E", "E", "c♯", "c♯", "c♯", "A",
-            "B", "e♭°", "B", "B",
+            "A", "A", "B", "E♭m", "B", "B", "B", "E", "E", "C♯m", "C♯m", "C♯m", "A", "A", "B", "B",
+            "E", "E", "C♯m", "C♯m", "C♯m", "A", "A", "B", "B", "B", "E", "E", "C♯m", "C♯m", "C♯m",
+            "A", "B", "E♭°", "B", "B",
         ];
         let chords = PitchSequence::new(&recording).chords_starts_durations();
         for (i, chord_str) in expected.iter().enumerate() {
