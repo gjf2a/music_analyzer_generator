@@ -4,7 +4,8 @@ use std::{collections::VecDeque, fmt::Display};
 
 use enum_iterator::Sequence;
 use midi_msg::MidiMsg;
-use midi_note_recorder::{Recording, note_velocity_from};
+use midi_note_recorder::Recording;
+use midi_fundsp::note_velocity_from;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Sequence)]
 pub enum NoteLetter {

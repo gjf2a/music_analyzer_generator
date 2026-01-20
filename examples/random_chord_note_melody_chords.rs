@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 
+use crossbeam_utils::atomic::AtomicCell;
 use midi_note_recorder::{Recording, stereo_playback};
 use music_analyzer_generator::{
     PitchSequence, consolidated_note_rest_times, duration_clusters, durations_notes_from,
@@ -32,6 +33,7 @@ fn main() -> anyhow::Result<()> {
     start_output_thread::<10>(outgoing.clone(), program_table.clone());
     outgoing.push(SynthMsg::program_change(1, Speaker::Left));
     outgoing.push(SynthMsg::program_change(13, Speaker::Right));
+    let playback_progress = Arc::new(AtomicCell::new(None));
 
     stereo_playback(
         &recording,
@@ -45,6 +47,7 @@ fn main() -> anyhow::Result<()> {
             msg,
             speaker: Speaker::Right,
         },
+        playback_progress.clone(),
     );
 
     Ok(())
