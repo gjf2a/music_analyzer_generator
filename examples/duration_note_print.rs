@@ -1,5 +1,5 @@
 use midi_note_recorder::Recording;
-use music_analyzer_generator::{durations_notes_from, NoteName};
+use music_analyzer_generator::{NoteName, durations_notes_from};
 
 fn main() -> anyhow::Result<()> {
     let args = std::env::args().collect::<Vec<_>>();

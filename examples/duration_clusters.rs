@@ -1,5 +1,7 @@
 use midi_note_recorder::Recording;
-use music_analyzer_generator::{consolidated_note_rest_times, duration_clusters, durations_notes_from};
+use music_analyzer_generator::{
+    consolidated_note_rest_times, duration_clusters, durations_notes_from,
+};
 
 fn main() -> anyhow::Result<()> {
     let args = std::env::args().collect::<Vec<_>>();

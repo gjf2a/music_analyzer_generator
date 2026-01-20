@@ -1,6 +1,6 @@
 use midi_note_recorder::Recording;
 use music_analyzer_generator::{
-    consolidated_note_rest_times, durations_notes_from, partitioned_melody, NoteName,
+    NoteName, consolidated_note_rest_times, durations_notes_from, partitioned_melody,
 };
 
 fn main() -> anyhow::Result<()> {

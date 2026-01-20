@@ -4,7 +4,7 @@ use std::{collections::VecDeque, fmt::Display};
 
 use enum_iterator::Sequence;
 use midi_msg::MidiMsg;
-use midi_note_recorder::{note_velocity_from, Recording};
+use midi_note_recorder::{Recording, note_velocity_from};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Sequence)]
 pub enum NoteLetter {
@@ -180,9 +180,10 @@ impl ChordName {
     }
 
     pub fn compact_name(&self) -> String {
-        let note_letter = format!("{:?}{}", self.note, self.accidental.symbol());
+        let base_note_letter = format!("{:?}{}", self.note, self.accidental.symbol());
+        let note_letter = base_note_letter.trim();
         match self.mode {
-            ChordMode::Major => note_letter,
+            ChordMode::Major => note_letter.to_owned(),
             ChordMode::Minor => note_letter.to_lowercase(),
             ChordMode::Diminished => format!("{}\u{00b0}", note_letter.to_lowercase()),
             ChordMode::Augmented => format!("{note_letter}+"),
@@ -758,7 +759,7 @@ mod tests {
     use std::collections::BTreeSet;
 
     use midi_msg::Channel;
-    use midi_note_recorder::{midi_msg_from, Recording};
+    use midi_note_recorder::{Recording, midi_msg_from};
     use rand::Rng;
 
     use crate::{Accidental, ActivePitches, NoteLetter, NoteName, PitchSequence, ScaleMode};
@@ -780,7 +781,7 @@ mod tests {
             (71, NoteLetter::B, Accidental::Natural),
         ];
         for (pitch, letter, modifier) in note_name {
-            assert_eq!(NoteName::name_of(pitch), NoteName {letter, modifier});
+            assert_eq!(NoteName::name_of(pitch), NoteName { letter, modifier });
         }
     }
 
@@ -808,7 +809,9 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(
             c_notes[..15],
-            vec![120, 119, 117, 115, 113, 112, 110, 108, 107, 105, 103, 101, 100, 98, 96]
+            vec![
+                120, 119, 117, 115, 113, 112, 110, 108, 107, 105, 103, 101, 100, 98, 96
+            ]
         );
     }
 
@@ -941,50 +944,18 @@ B  Major ([59, 63, 66])";
         }
     }
 
-
     #[test]
     fn test_chord_compact() {
         let recording = Recording::from_file("healing4").unwrap();
-        let expected = "A  
-A  
-B  
-e♭ 
-B  
-B  
-B  
-E  
-E  
-c♯ 
-c♯ 
-c♯ 
-A  
-A  
-B  
-B  
-E  
-E  
-c♯ 
-c♯ 
-c♯ 
-A  
-A  
-B  
-B  
-B  
-E  
-E  
-c♯ 
-c♯ 
-c♯ 
-A  
-B  
-e♭ °
-B  
-B  ";
+        let expected = [
+            "A", "A", "B", "e♭", "B", "B", "B", "E", "E", "c♯", "c♯", "c♯", "A", "A", "B", "B",
+            "E", "E", "c♯", "c♯", "c♯", "A", "A", "B", "B", "B", "E", "E", "c♯", "c♯", "c♯", "A",
+            "B", "e♭°", "B", "B",
+        ];
         let chords = PitchSequence::new(&recording).chords_starts_durations();
-        for (i, chord_str) in expected.lines().enumerate() {
+        for (i, chord_str) in expected.iter().enumerate() {
             let c = chords[i].0.name().compact_name();
-            assert_eq!(c, chord_str);
+            assert_eq!(c, *chord_str);
         }
     }
 }
