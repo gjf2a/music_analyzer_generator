@@ -178,6 +178,16 @@ impl ChordName {
     pub fn new(active: ActivePitches) -> Option<Self> {
         SimpleChordInfo::new(active).map(|info| info.mode())
     }
+
+    pub fn compact_name(&self) -> String {
+        let note_letter = format!("{:?}{}", self.note, self.accidental.symbol());
+        match self.mode {
+            ChordMode::Major => note_letter,
+            ChordMode::Minor => note_letter.to_lowercase(),
+            ChordMode::Diminished => format!("{}\u{00b0}", note_letter.to_lowercase()),
+            ChordMode::Augmented => format!("{note_letter}+"),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -928,6 +938,53 @@ B  Major ([59, 63, 66])";
         let chords = PitchSequence::new(&recording).chords_starts_durations();
         for (i, chord_str) in expected.lines().enumerate() {
             assert_eq!(format!("{}", chords[i].0), chord_str);
+        }
+    }
+
+
+    #[test]
+    fn test_chord_compact() {
+        let recording = Recording::from_file("healing4").unwrap();
+        let expected = "A  
+A  
+B  
+e♭ 
+B  
+B  
+B  
+E  
+E  
+c♯ 
+c♯ 
+c♯ 
+A  
+A  
+B  
+B  
+E  
+E  
+c♯ 
+c♯ 
+c♯ 
+A  
+A  
+B  
+B  
+B  
+E  
+E  
+c♯ 
+c♯ 
+c♯ 
+A  
+B  
+e♭ °
+B  
+B  ";
+        let chords = PitchSequence::new(&recording).chords_starts_durations();
+        for (i, chord_str) in expected.lines().enumerate() {
+            let c = chords[i].0.name().compact_name();
+            assert_eq!(c, chord_str);
         }
     }
 }
