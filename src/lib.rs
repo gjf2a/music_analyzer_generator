@@ -970,23 +970,6 @@ B  Major ([59, 63, 66])";
     }
 
     #[test]
-    fn test_note_collections() {
-        for (note, modifier) in MAJOR_ROOT_IDS.iter() {
-            let note = NoteName { letter: *note, modifier: *modifier };
-            let notes = ScaleMode::Major.notes_going_up(note).collect::<BTreeSet<_>>();
-            print !("{note}; ");
-            if notes.contains(&60) {
-                print!("60");
-            } else if notes.contains(&61) {
-                print!("61");
-            } else {
-                print!("59");
-            }
-            println!(" {notes:?}");
-        }
-    }
-
-    #[test]
     fn test_middle_c() {
         let expected = [60, 60, 61, 60, 61, 60, 61, 60, 60, 61, 60, 61];
         for i in 0..expected.len() {
