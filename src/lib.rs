@@ -1,6 +1,6 @@
 pub mod generator;
 
-use std::{collections::VecDeque, fmt::Display};
+use std::{collections::{BTreeSet, VecDeque}, fmt::Display};
 
 use enum_iterator::Sequence;
 use midi_msg::MidiMsg;
@@ -211,24 +211,24 @@ pub enum ScaleMode {
 impl ScaleMode {
     fn pattern_up(&self) -> ScalePattern {
         match self {
-            ScaleMode::Major => ScalePattern::mode_rotation(0),
-            ScaleMode::Dorian => ScalePattern::mode_rotation(1),
-            ScaleMode::Phrygian => ScalePattern::mode_rotation(2),
-            ScaleMode::Lydian => ScalePattern::mode_rotation(3),
-            ScaleMode::Mixolydian => ScalePattern::mode_rotation(4),
-            ScaleMode::Minor => ScalePattern::mode_rotation(5),
-            ScaleMode::Locrian => ScalePattern::mode_rotation(6),
-            ScaleMode::HarmonicMinor => ScalePattern::standard([2, 1, 2, 2, 1, 3, 1]),
-            ScaleMode::MelodicMinor => ScalePattern::standard([2, 1, 2, 2, 2, 2, 1]),
-            ScaleMode::WholeTone => ScalePattern {
+            Self::Major => ScalePattern::mode_rotation(0),
+            Self::Dorian => ScalePattern::mode_rotation(1),
+            Self::Phrygian => ScalePattern::mode_rotation(2),
+            Self::Lydian => ScalePattern::mode_rotation(3),
+            Self::Mixolydian => ScalePattern::mode_rotation(4),
+            Self::Minor => ScalePattern::mode_rotation(5),
+            Self::Locrian => ScalePattern::mode_rotation(6),
+            Self::HarmonicMinor => ScalePattern::standard([2, 1, 2, 2, 1, 3, 1]),
+            Self::MelodicMinor => ScalePattern::standard([2, 1, 2, 2, 2, 2, 1]),
+            Self::WholeTone => ScalePattern {
                 num_jumps: 6,
                 jumps: [2, 2, 2, 2, 2, 2, 0, 0],
             },
-            ScaleMode::Diminished => ScalePattern {
+            Self::Diminished => ScalePattern {
                 num_jumps: 8,
                 jumps: [2, 1, 2, 1, 2, 1, 2, 1],
             },
-            ScaleMode::Augmented => ScalePattern {
+            Self::Augmented => ScalePattern {
                 num_jumps: 6,
                 jumps: [3, 1, 3, 1, 3, 1, 0, 0],
             },
@@ -237,10 +237,19 @@ impl ScaleMode {
 
     fn pattern_down(&self) -> ScalePattern {
         match self {
-            ScaleMode::MelodicMinor => ScalePattern::mode_rotation(5),
+            Self::MelodicMinor => ScalePattern::mode_rotation(5),
             _ => self.pattern_up(),
         }
         .reversed()
+    }
+
+    pub fn middle_c(&self, root: NoteName) -> u8 {
+        let notes = ScaleMode::Major.notes_going_up(root).collect::<BTreeSet<_>>();
+        if notes.contains(&60) {
+            60
+        } else {
+            61
+        }
     }
 
     pub fn notes_going_up(&self, root: NoteName) -> impl Iterator<Item = u8> {
@@ -763,7 +772,7 @@ mod tests {
     use midi_note_recorder::{Recording, midi_msg_from};
     use rand::Rng;
 
-    use crate::{Accidental, ActivePitches, NoteLetter, NoteName, PitchSequence, ScaleMode};
+    use crate::{Accidental, ActivePitches, MAJOR_ROOT_IDS, NoteLetter, NoteName, PitchSequence, ScaleMode};
 
     #[test]
     fn test_note_names() {
@@ -957,6 +966,32 @@ B  Major ([59, 63, 66])";
         for (i, chord_str) in expected.iter().enumerate() {
             let c = chords[i].0.name().compact_name();
             assert_eq!(c, *chord_str);
+        }
+    }
+
+    #[test]
+    fn test_note_collections() {
+        for (note, modifier) in MAJOR_ROOT_IDS.iter() {
+            let note = NoteName { letter: *note, modifier: *modifier };
+            let notes = ScaleMode::Major.notes_going_up(note).collect::<BTreeSet<_>>();
+            print !("{note}; ");
+            if notes.contains(&60) {
+                print!("60");
+            } else if notes.contains(&61) {
+                print!("61");
+            } else {
+                print!("59");
+            }
+            println!(" {notes:?}");
+        }
+    }
+
+    #[test]
+    fn test_middle_c() {
+        let expected = [60, 60, 61, 60, 61, 60, 61, 60, 60, 61, 60, 61];
+        for i in 0..expected.len() {
+            let note = NoteName { letter: MAJOR_ROOT_IDS[i].0, modifier: MAJOR_ROOT_IDS[i].1 };
+            assert_eq!(expected[i], ScaleMode::Major.middle_c(note));
         }
     }
 }
