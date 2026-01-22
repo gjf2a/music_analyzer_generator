@@ -209,6 +209,10 @@ pub enum ScaleMode {
 }
 
 impl ScaleMode {
+    pub fn rooted(&self, root: NoteName) -> RootedScale {
+        RootedScale { mode: *self, root }
+    }
+
     fn pattern_up(&self) -> ScalePattern {
         match self {
             Self::Major => ScalePattern::mode_rotation(0),
@@ -235,19 +239,6 @@ impl ScaleMode {
         }
     }
 
-    pub fn diatonic_steps_between(&self, root: NoteName, pitch_1: u8, pitch_2: u8) -> Option<u8> {
-        if pitch_1 > pitch_2 {
-            self.diatonic_steps_between(root, pitch_2, pitch_1)
-        } else {
-            let interval = self.notes_going_up(root).skip_while(|n| *n < pitch_1).take_while(|n| *n <= pitch_2).collect::<Vec<_>>();
-            if interval.len() == 0 || interval[0] != pitch_1 || interval[interval.len() - 1] != pitch_2 {
-                None
-            } else {
-                Some((interval.len() - 1) as u8)
-            }
-        }
-    }
-
     fn pattern_down(&self) -> ScalePattern {
         match self {
             Self::MelodicMinor => ScalePattern::mode_rotation(5),
@@ -255,9 +246,16 @@ impl ScaleMode {
         }
         .reversed()
     }
+}
 
-    pub fn middle_c(&self, root: NoteName) -> u8 {
-        let notes = self.notes_going_up(root).collect::<BTreeSet<_>>();
+pub struct RootedScale {
+    mode: ScaleMode,
+    root: NoteName,
+}
+
+impl RootedScale {    
+    pub fn middle_c(&self) -> u8 {
+        let notes = self.notes_going_up().collect::<BTreeSet<_>>();
         if notes.contains(&60) {
             60
         } else {
@@ -265,43 +263,56 @@ impl ScaleMode {
         }
     }
 
-    pub fn round_up(&self, root: NoteName, pitch: u8) -> u8 {
-        self.notes_going_up(root).skip_while(|n| *n < pitch).next().unwrap()
+    pub fn round_up(&self, pitch: u8) -> u8 {
+        self.notes_going_up().skip_while(|n| *n < pitch).next().unwrap()
     }
 
-    pub fn round_down(&self, root: NoteName, pitch: u8) -> u8 {
-        self.notes_going_down(root).skip_while(|n| *n > pitch).next().unwrap()
+    pub fn round_down(&self, pitch: u8) -> u8 {
+        self.notes_going_down().skip_while(|n| *n > pitch).next().unwrap()
     }
 
-    pub fn notes_going_up(&self, root: NoteName) -> impl Iterator<Item = u8> {
+    pub fn notes_going_up(&self) -> impl Iterator<Item = u8> {
         ScaleUpIterator {
-            pattern: self.pattern_up(),
-            current: root.lowest_midi_note(),
+            pattern: self.mode.pattern_up(),
+            current: self.root.lowest_midi_note(),
             count: 0,
         }
     }
 
-    pub fn notes_going_down(&self, root: NoteName) -> impl Iterator<Item = u8> {
-        let root_note = root.lowest_midi_note();
+    pub fn notes_going_down(&self) -> impl Iterator<Item = u8> {
+        let root_note = self.root.lowest_midi_note();
         ScaleDownIterator {
-            pattern: self.pattern_down(),
+            pattern: self.mode.pattern_down(),
             current: root_note + if root_note > 7 { 108 } else { 120 },
             count: 0,
         }
     }
 
-    pub fn note_up(&self, root: NoteName, current: u8, interval: usize) -> Option<u8> {
-        self.notes_going_up(root)
+    pub fn note_up(&self, current: u8, interval: usize) -> Option<u8> {
+        self.notes_going_up()
             .skip_while(|n| *n < current)
             .skip(interval - 1)
             .next()
     }
 
-    pub fn note_down(&self, root: NoteName, current: u8, interval: usize) -> Option<u8> {
-        self.notes_going_down(root)
+    pub fn note_down(&self, current: u8, interval: usize) -> Option<u8> {
+        self.notes_going_down()
             .skip_while(|n| *n > current)
             .skip(interval - 1)
             .next()
+    }
+
+    pub fn diatonic_steps_between(&self, pitch_1: u8, pitch_2: u8) -> Option<u8> {
+        if pitch_1 > pitch_2 {
+            self.diatonic_steps_between(pitch_2, pitch_1)
+        } else {
+            let interval = self.notes_going_up().skip_while(|n| *n < pitch_1).take_while(|n| *n <= pitch_2).collect::<Vec<_>>();
+            if interval.len() == 0 || interval[0] != pitch_1 || interval[interval.len() - 1] != pitch_2 {
+                None
+            } else {
+                Some((interval.len() - 1) as u8)
+            }
+        }
     }
 }
 
@@ -818,11 +829,12 @@ mod tests {
 
     #[test]
     fn test_ascending_scale() {
-        let c_notes = ScaleMode::Major
-            .notes_going_up(NoteName {
+        let scale = ScaleMode::Major.rooted(NoteName {
                 letter: NoteLetter::C,
                 modifier: Accidental::Natural,
-            })
+            });
+        let c_notes = scale
+            .notes_going_up()
             .collect::<Vec<_>>();
         assert_eq!(
             c_notes[..15],
@@ -832,11 +844,11 @@ mod tests {
 
     #[test]
     fn test_descending_scale() {
-        let c_notes = ScaleMode::Major
-            .notes_going_down(NoteName {
+        let c_notes = ScaleMode::Major.rooted(NoteName {
                 letter: NoteLetter::C,
                 modifier: Accidental::Natural,
             })
+            .notes_going_down()
             .collect::<Vec<_>>();
         assert_eq!(
             c_notes[..15],
@@ -868,7 +880,8 @@ mod tests {
             (root2, ScaleMode::MelodicMinor, 66, 6, 75),
             (root3, ScaleMode::MelodicMinor, 58, 7, 69),
         ] {
-            assert_eq!(mode.note_up(root, current, interval).unwrap(), expected);
+            let scale = mode.rooted(root);
+            assert_eq!(scale.note_up(current, interval).unwrap(), expected);
         }
     }
 
@@ -894,7 +907,8 @@ mod tests {
             (root2, ScaleMode::MelodicMinor, 66, 3, 62),
             (root3, ScaleMode::MelodicMinor, 58, 7, 48),
         ] {
-            assert_eq!(mode.note_down(root, current, interval).unwrap(), expected);
+            let scale = mode.rooted(root);
+            assert_eq!(scale.note_down(current, interval).unwrap(), expected);
         }
     }
 
@@ -995,13 +1009,13 @@ B  Major ([59, 63, 66])";
         let expected = [60, 60, 61, 60, 61, 60, 61, 60, 60, 61, 60, 61];
         for i in 0..expected.len() {
             let note = NoteName { letter: MAJOR_ROOT_IDS[i].0, modifier: MAJOR_ROOT_IDS[i].1 };
-            assert_eq!(expected[i], ScaleMode::Major.middle_c(note));
+            assert_eq!(expected[i], ScaleMode::Major.rooted(note).middle_c());
         }
     }
 
     #[test]
     fn test_diatonic_intervals() {
-        for (root, scale, p1, p2, expected) in [
+        for (root, mode, p1, p2, expected) in [
             (71, ScaleMode::Major, 70, 75, Some(3)),
             (71, ScaleMode::Major, 75, 70, Some(3)),
             (71, ScaleMode::Major, 70, 74, None),
@@ -1009,29 +1023,32 @@ B  Major ([59, 63, 66])";
             (62, ScaleMode::Dorian, 65, 74, Some(5)),
         ] {
             let root = NoteName::name_of(root);
-            assert_eq!(scale.diatonic_steps_between(root, p1, p2), expected);
+            let scale = mode.rooted(root);
+            assert_eq!(scale.diatonic_steps_between(p1, p2), expected);
         }
     }
 
     #[test]
     fn test_round_up() {
-        for (root, scale, pitch, expected) in [
+        for (root, mode, pitch, expected) in [
             (65, ScaleMode::Major, 71, 72),
             (65, ScaleMode::Major, 72, 72),
         ] {
             let root = NoteName::name_of(root);
-            assert_eq!(scale.round_up(root, pitch), expected);
+            let scale = mode.rooted(root);
+            assert_eq!(scale.round_up(pitch), expected);
         }
     }
 
     #[test]
     fn test_round_down() {
-        for (root, scale, pitch, expected) in [
+        for (root, mode, pitch, expected) in [
             (65, ScaleMode::Major, 71, 70),
             (65, ScaleMode::Major, 72, 72),
         ] {
             let root = NoteName::name_of(root);
-            assert_eq!(scale.round_down(root, pitch), expected);
+            let scale = mode.rooted(root);
+            assert_eq!(scale.round_down(pitch), expected);
         }
     }
 }
