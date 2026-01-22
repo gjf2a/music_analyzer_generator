@@ -235,6 +235,19 @@ impl ScaleMode {
         }
     }
 
+    pub fn diatonic_steps_between(&self, root: NoteName, pitch_1: u8, pitch_2: u8) -> Option<u8> {
+        if pitch_1 > pitch_2 {
+            self.diatonic_steps_between(root, pitch_2, pitch_1)
+        } else {
+            let interval = self.notes_going_up(root).skip_while(|n| *n < pitch_1).take_while(|n| *n <= pitch_2).collect::<Vec<_>>();
+            if interval.len() == 0 || interval[0] != pitch_1 || interval[interval.len() - 1] != pitch_2 {
+                None
+            } else {
+                Some((interval.len() - 1) as u8)
+            }
+        }
+    }
+
     fn pattern_down(&self) -> ScalePattern {
         match self {
             Self::MelodicMinor => ScalePattern::mode_rotation(5),
@@ -975,6 +988,20 @@ B  Major ([59, 63, 66])";
         for i in 0..expected.len() {
             let note = NoteName { letter: MAJOR_ROOT_IDS[i].0, modifier: MAJOR_ROOT_IDS[i].1 };
             assert_eq!(expected[i], ScaleMode::Major.middle_c(note));
+        }
+    }
+
+    #[test]
+    fn test_diatonic_intervals() {
+        for (root, scale, p1, p2, expected) in [
+            (71, ScaleMode::Major, 70, 75, Some(3)),
+            (71, ScaleMode::Major, 75, 70, Some(3)),
+            (71, ScaleMode::Major, 70, 74, None),
+            (67, ScaleMode::Major, 71, 71, Some(0)),
+            (62, ScaleMode::Dorian, 65, 74, Some(5)),
+        ] {
+            let root = NoteName::name_of(root);
+            assert_eq!(scale.diatonic_steps_between(root, p1, p2), expected);
         }
     }
 }
