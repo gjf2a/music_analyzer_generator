@@ -257,12 +257,20 @@ impl ScaleMode {
     }
 
     pub fn middle_c(&self, root: NoteName) -> u8 {
-        let notes = ScaleMode::Major.notes_going_up(root).collect::<BTreeSet<_>>();
+        let notes = self.notes_going_up(root).collect::<BTreeSet<_>>();
         if notes.contains(&60) {
             60
         } else {
             61
         }
+    }
+
+    pub fn round_up(&self, root: NoteName, pitch: u8) -> u8 {
+        self.notes_going_up(root).skip_while(|n| *n < pitch).next().unwrap()
+    }
+
+    pub fn round_down(&self, root: NoteName, pitch: u8) -> u8 {
+        self.notes_going_down(root).skip_while(|n| *n > pitch).next().unwrap()
     }
 
     pub fn notes_going_up(&self, root: NoteName) -> impl Iterator<Item = u8> {
@@ -1002,6 +1010,28 @@ B  Major ([59, 63, 66])";
         ] {
             let root = NoteName::name_of(root);
             assert_eq!(scale.diatonic_steps_between(root, p1, p2), expected);
+        }
+    }
+
+    #[test]
+    fn test_round_up() {
+        for (root, scale, pitch, expected) in [
+            (65, ScaleMode::Major, 71, 72),
+            (65, ScaleMode::Major, 72, 72),
+        ] {
+            let root = NoteName::name_of(root);
+            assert_eq!(scale.round_up(root, pitch), expected);
+        }
+    }
+
+    #[test]
+    fn test_round_down() {
+        for (root, scale, pitch, expected) in [
+            (65, ScaleMode::Major, 71, 70),
+            (65, ScaleMode::Major, 72, 72),
+        ] {
+            let root = NoteName::name_of(root);
+            assert_eq!(scale.round_down(root, pitch), expected);
         }
     }
 }
