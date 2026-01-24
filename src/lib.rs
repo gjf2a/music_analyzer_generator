@@ -299,15 +299,18 @@ impl RootedScale {
     pub fn all_diatonic_notes(&self) -> impl Iterator<Item = (u8, NoteName)> {
         self.all_diatonic_note_letters().map(|(pitch, letter)| {
             let offset = letter.steps_above_natural(pitch);
-            (pitch, NoteName {
-                letter,
-                modifier: match offset {
-                    -1 => Accidental::Flat,
-                    0 => Accidental::Natural,
-                    1 => Accidental::Sharp,
-                    _ => panic!("Offset {offset} beyond +/- 1 undefined")
-                }
-            })
+            (
+                pitch,
+                NoteName {
+                    letter,
+                    modifier: match offset {
+                        -1 => Accidental::Flat,
+                        0 => Accidental::Natural,
+                        1 => Accidental::Sharp,
+                        _ => panic!("Offset {offset} beyond +/- 1 undefined"),
+                    },
+                },
+            )
         })
     }
 
@@ -1243,8 +1246,6 @@ B  Major ([59, 63, 66])";
         }
     }
 
-
-
     #[test]
     fn test_note_name_letters() {
         for (scale, root, letters) in [
@@ -1340,7 +1341,7 @@ B  Major ([59, 63, 66])";
                 .collect::<Vec<_>>();
             for i in 0..letters.len() {
                 let (pitch, letter, modifier) = letters[i];
-                let name = NoteName {letter, modifier};
+                let name = NoteName { letter, modifier };
                 assert_eq!(values[i], (pitch, name));
             }
         }
