@@ -322,6 +322,20 @@ impl RootedScale {
         if self.contains(60) { 60 } else { 61 }
     }
 
+    pub fn all_sharps(&self) -> impl Iterator<Item = NoteLetter> {
+        self.all_diatonic_notes()
+            .take(7)
+            .filter(|(_, n)| n.modifier == Accidental::Sharp)
+            .map(|(_, n)| n.letter)
+    }
+
+    pub fn all_flats(&self) -> impl Iterator<Item = NoteLetter> {
+        self.all_diatonic_notes()
+            .take(7)
+            .filter(|(_, n)| n.modifier == Accidental::Flat)
+            .map(|(_, n)| n.letter)
+    }
+
     pub fn round_up(&self, pitch: u8) -> u8 {
         self.notes_going_up()
             .skip_while(|n| *n < pitch)
@@ -1344,6 +1358,74 @@ B  Major ([59, 63, 66])";
                 let name = NoteName { letter, modifier };
                 assert_eq!(values[i], (pitch, name));
             }
+        }
+    }
+
+    #[test]
+    fn test_all_flats() {
+        for (scale, root, target) in [
+            (ScaleMode::Major, 60, vec![]),
+            (
+                ScaleMode::Minor,
+                60,
+                vec![NoteLetter::E, NoteLetter::A, NoteLetter::B],
+            ),
+            (ScaleMode::Major, 62, vec![]),
+            (ScaleMode::Major, 17, vec![NoteLetter::B]),
+            (
+                ScaleMode::Minor,
+                17,
+                vec![NoteLetter::A, NoteLetter::B, NoteLetter::D, NoteLetter::E],
+            ),
+            (
+                ScaleMode::Major,
+                61,
+                vec![
+                    NoteLetter::D,
+                    NoteLetter::E,
+                    NoteLetter::G,
+                    NoteLetter::A,
+                    NoteLetter::B,
+                ],
+            ),
+        ] {
+            let rooted = scale.rooted(NoteName::name_of(root));
+            assert_eq!(target, rooted.all_flats().collect::<Vec<_>>());
+        }
+    }
+
+    #[test]
+    fn test_all_sharps() {
+        for (scale, root, target) in [
+            (ScaleMode::Major, 60, vec![]),
+            (ScaleMode::Minor, 60, vec![]),
+            (ScaleMode::Major, 62, vec![NoteLetter::F, NoteLetter::C]),
+            (
+                ScaleMode::Major,
+                59,
+                vec![
+                    NoteLetter::C,
+                    NoteLetter::D,
+                    NoteLetter::F,
+                    NoteLetter::G,
+                    NoteLetter::A,
+                ],
+            ),
+            (
+                ScaleMode::Major,
+                18,
+                vec![
+                    NoteLetter::F,
+                    NoteLetter::G,
+                    NoteLetter::A,
+                    NoteLetter::C,
+                    NoteLetter::D,
+                    NoteLetter::E,
+                ],
+            ),
+        ] {
+            let rooted = scale.rooted(NoteName::name_of(root));
+            assert_eq!(target, rooted.all_sharps().collect::<Vec<_>>());
         }
     }
 }
