@@ -1,11 +1,14 @@
 pub mod generator;
 
-use std::{collections::{BTreeSet, VecDeque}, fmt::Display};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    fmt::Display,
+};
 
-use enum_iterator::Sequence;
+use enum_iterator::{Sequence, all};
+use midi_fundsp::note_velocity_from;
 use midi_msg::MidiMsg;
 use midi_note_recorder::Recording;
-use midi_fundsp::note_velocity_from;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Sequence)]
 pub enum NoteLetter {
@@ -36,6 +39,17 @@ impl NoteLetter {
             NoteLetter::G => 7,
             NoteLetter::A => 9,
             NoteLetter::B => 11,
+        }
+    }
+
+    pub fn steps_above_natural(&self, pitch: u8) -> i16 {
+        assert!(pitch >= self.natural_pitch());
+        let start = self.natural_pitch();
+        let note_offset = ((pitch - start) % 12) as i16;
+        if note_offset > 6 {
+            note_offset - 12
+        } else {
+            note_offset
         }
     }
 }
@@ -210,7 +224,7 @@ pub enum ScaleMode {
 
 impl ScaleMode {
     pub fn rooted(&self, root: NoteName) -> RootedScale {
-        RootedScale { mode: *self, root }
+        RootedScale::new(*self, root)
     }
 
     fn pattern_up(&self) -> ScalePattern {
@@ -251,24 +265,69 @@ impl ScaleMode {
 pub struct RootedScale {
     mode: ScaleMode,
     root: NoteName,
+    notes2letters: BTreeMap<u8, NoteLetter>,
 }
 
-impl RootedScale {    
-    pub fn middle_c(&self) -> u8 {
-        let notes = self.notes_going_up().collect::<BTreeSet<_>>();
-        if notes.contains(&60) {
-            60
-        } else {
-            61
+impl RootedScale {
+    pub fn new(mode: ScaleMode, root: NoteName) -> Self {
+        let mut result = Self {
+            mode,
+            root,
+            notes2letters: BTreeMap::default(),
+        };
+        let notes2letters = result.all_diatonic_note_letters().collect();
+        result.notes2letters = notes2letters;
+        result
+    }
+
+    pub fn all_diatonic_note_letters(&self) -> impl Iterator<Item = (u8, NoteLetter)> {
+        let mut letters = all::<NoteLetter>().cycle().peekable();
+        loop {
+            let letter = letters.peek().unwrap();
+            if *letter == self.root.letter {
+                break;
+            } else {
+                letters.next();
+            }
         }
+        self.notes_going_up().zip(letters)
+    }
+
+    pub fn all_diatonic_notes(&self) -> impl Iterator<Item = (u8, NoteName)> {
+        self.all_diatonic_note_letters().map(|(pitch, letter)| {
+            let offset = letter.steps_above_natural(pitch);
+            (pitch, NoteName {
+                letter,
+                modifier: match offset {
+                    -1 => Accidental::Flat,
+                    0 => Accidental::Natural,
+                    1 => Accidental::Sharp,
+                    _ => panic!("Offset {offset} beyond +/- 1 undefined")
+                }
+            })
+        })
+    }
+
+    pub fn contains(&self, note: u8) -> bool {
+        self.notes2letters.contains_key(&note)
+    }
+
+    pub fn middle_c(&self) -> u8 {
+        if self.contains(60) { 60 } else { 61 }
     }
 
     pub fn round_up(&self, pitch: u8) -> u8 {
-        self.notes_going_up().skip_while(|n| *n < pitch).next().unwrap()
+        self.notes_going_up()
+            .skip_while(|n| *n < pitch)
+            .next()
+            .unwrap()
     }
 
     pub fn round_down(&self, pitch: u8) -> u8 {
-        self.notes_going_down().skip_while(|n| *n > pitch).next().unwrap()
+        self.notes_going_down()
+            .skip_while(|n| *n > pitch)
+            .next()
+            .unwrap()
     }
 
     pub fn notes_going_up(&self) -> impl Iterator<Item = u8> {
@@ -306,14 +365,40 @@ impl RootedScale {
         if pitch_1 > pitch_2 {
             self.diatonic_steps_between(pitch_2, pitch_1)
         } else {
-            let interval = self.notes_going_up().skip_while(|n| *n < pitch_1).take_while(|n| *n <= pitch_2).collect::<Vec<_>>();
-            if interval.len() == 0 || interval[0] != pitch_1 || interval[interval.len() - 1] != pitch_2 {
+            let interval = self
+                .notes_going_up()
+                .skip_while(|n| *n < pitch_1)
+                .take_while(|n| *n <= pitch_2)
+                .collect::<Vec<_>>();
+            if interval.len() == 0
+                || interval[0] != pitch_1
+                || interval[interval.len() - 1] != pitch_2
+            {
                 None
             } else {
                 Some((interval.len() - 1) as u8)
             }
         }
     }
+    /*
+    /// Returns 0 for the Middle C/C#/Cb position.
+    /// Returns positive numbers for the treble clef.
+    /// Returns negative numbers for the bass clef.
+    pub fn staff_position(&self, pitch: u8) -> (i16, Option<Accidental>) {
+        let (pitch, acc) = if self.contains(pitch) {
+            (pitch, None)
+        } else {
+            let closest = self.closest_scale_match(pitch);
+            (closest.0, Some(closest.2))
+        };
+        let mut steps = self.diatonic_steps_between(self.middle_c(), pitch)
+                .unwrap() as i16;
+        if pitch < self.middle_c() {
+            steps = -steps;
+        }
+        (steps, acc)
+    }
+    */
 }
 
 struct ScaleUpIterator {
@@ -804,7 +889,9 @@ mod tests {
     use midi_note_recorder::{Recording, midi_msg_from};
     use rand::Rng;
 
-    use crate::{Accidental, ActivePitches, MAJOR_ROOT_IDS, NoteLetter, NoteName, PitchSequence, ScaleMode};
+    use crate::{
+        Accidental, ActivePitches, MAJOR_ROOT_IDS, NoteLetter, NoteName, PitchSequence, ScaleMode,
+    };
 
     #[test]
     fn test_note_names() {
@@ -830,12 +917,10 @@ mod tests {
     #[test]
     fn test_ascending_scale() {
         let scale = ScaleMode::Major.rooted(NoteName {
-                letter: NoteLetter::C,
-                modifier: Accidental::Natural,
-            });
-        let c_notes = scale
-            .notes_going_up()
-            .collect::<Vec<_>>();
+            letter: NoteLetter::C,
+            modifier: Accidental::Natural,
+        });
+        let c_notes = scale.notes_going_up().collect::<Vec<_>>();
         assert_eq!(
             c_notes[..15],
             vec![0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17, 19, 21, 23, 24]
@@ -844,7 +929,8 @@ mod tests {
 
     #[test]
     fn test_descending_scale() {
-        let c_notes = ScaleMode::Major.rooted(NoteName {
+        let c_notes = ScaleMode::Major
+            .rooted(NoteName {
                 letter: NoteLetter::C,
                 modifier: Accidental::Natural,
             })
@@ -1008,7 +1094,10 @@ B  Major ([59, 63, 66])";
     fn test_middle_c() {
         let expected = [60, 60, 61, 60, 61, 60, 61, 60, 60, 61, 60, 61];
         for i in 0..expected.len() {
-            let note = NoteName { letter: MAJOR_ROOT_IDS[i].0, modifier: MAJOR_ROOT_IDS[i].1 };
+            let note = NoteName {
+                letter: MAJOR_ROOT_IDS[i].0,
+                modifier: MAJOR_ROOT_IDS[i].1,
+            };
             assert_eq!(expected[i], ScaleMode::Major.rooted(note).middle_c());
         }
     }
@@ -1049,6 +1138,105 @@ B  Major ([59, 63, 66])";
             let root = NoteName::name_of(root);
             let scale = mode.rooted(root);
             assert_eq!(scale.round_down(pitch), expected);
+        }
+    }
+
+    #[test]
+    fn test_note_letters() {
+        for (scale, root, letters) in [
+            (
+                ScaleMode::Major,
+                60,
+                [
+                    (0, NoteLetter::C),
+                    (2, NoteLetter::D),
+                    (4, NoteLetter::E),
+                    (5, NoteLetter::F),
+                    (7, NoteLetter::G),
+                    (9, NoteLetter::A),
+                    (11, NoteLetter::B),
+                    (12, NoteLetter::C),
+                    (14, NoteLetter::D),
+                    (16, NoteLetter::E),
+                    (17, NoteLetter::F),
+                    (19, NoteLetter::G),
+                    (21, NoteLetter::A),
+                    (23, NoteLetter::B),
+                    (24, NoteLetter::C),
+                ],
+            ),
+            (
+                ScaleMode::Major,
+                59,
+                [
+                    (11, NoteLetter::B),
+                    (13, NoteLetter::C),
+                    (15, NoteLetter::D),
+                    (16, NoteLetter::E),
+                    (18, NoteLetter::F),
+                    (20, NoteLetter::G),
+                    (22, NoteLetter::A),
+                    (23, NoteLetter::B),
+                    (25, NoteLetter::C),
+                    (27, NoteLetter::D),
+                    (28, NoteLetter::E),
+                    (30, NoteLetter::F),
+                    (32, NoteLetter::G),
+                    (34, NoteLetter::A),
+                    (35, NoteLetter::B),
+                ],
+            ),
+            (
+                ScaleMode::Minor,
+                58,
+                [
+                    (10, NoteLetter::B),
+                    (12, NoteLetter::C),
+                    (13, NoteLetter::D),
+                    (15, NoteLetter::E),
+                    (17, NoteLetter::F),
+                    (18, NoteLetter::G),
+                    (20, NoteLetter::A),
+                    (22, NoteLetter::B),
+                    (24, NoteLetter::C),
+                    (25, NoteLetter::D),
+                    (27, NoteLetter::E),
+                    (29, NoteLetter::F),
+                    (30, NoteLetter::G),
+                    (32, NoteLetter::A),
+                    (34, NoteLetter::B),
+                ],
+            ),
+            (
+                ScaleMode::Minor,
+                60,
+                [
+                    (0, NoteLetter::C),
+                    (2, NoteLetter::D),
+                    (3, NoteLetter::E),
+                    (5, NoteLetter::F),
+                    (7, NoteLetter::G),
+                    (8, NoteLetter::A),
+                    (10, NoteLetter::B),
+                    (12, NoteLetter::C),
+                    (14, NoteLetter::D),
+                    (15, NoteLetter::E),
+                    (17, NoteLetter::F),
+                    (19, NoteLetter::G),
+                    (20, NoteLetter::A),
+                    (22, NoteLetter::B),
+                    (24, NoteLetter::C),
+                ],
+            ),
+        ] {
+            let rooted = scale.rooted(NoteName::name_of(root));
+            let values = rooted
+                .all_diatonic_note_letters()
+                .take(letters.len())
+                .collect::<Vec<_>>();
+            for i in 0..letters.len() {
+                assert_eq!(values[i], letters[i]);
+            }
         }
     }
 }
