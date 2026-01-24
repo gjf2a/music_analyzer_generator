@@ -36,11 +36,15 @@ fn main() -> anyhow::Result<()> {
     start_output_thread::<10>(outgoing.clone(), program_table.clone());
     outgoing.push(SynthMsg::program_change(1, Speaker::Both));
     let playback_progress = Arc::new(AtomicCell::new(None));
-    melody_recording.playback_loop(None, outgoing, |msg| SynthMsg {
-        msg,
-        speaker: Speaker::Both,
-    },
-playback_progress.clone());
+    melody_recording.playback_loop(
+        None,
+        outgoing,
+        |msg| SynthMsg {
+            msg,
+            speaker: Speaker::Both,
+        },
+        playback_progress.clone(),
+    );
 
     Ok(())
 }
