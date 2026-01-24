@@ -43,7 +43,10 @@ impl NoteLetter {
     }
 
     pub fn steps_above_natural(&self, pitch: u8) -> i16 {
-        assert!(pitch >= self.natural_pitch());
+        let mut pitch = pitch;
+        while pitch < self.natural_pitch() {
+            pitch += 12;
+        }
         let start = self.natural_pitch();
         let note_offset = ((pitch - start) % 12) as i16;
         if note_offset > 6 {
@@ -1236,6 +1239,109 @@ B  Major ([59, 63, 66])";
                 .collect::<Vec<_>>();
             for i in 0..letters.len() {
                 assert_eq!(values[i], letters[i]);
+            }
+        }
+    }
+
+
+
+    #[test]
+    fn test_note_name_letters() {
+        for (scale, root, letters) in [
+            (
+                ScaleMode::Major,
+                60,
+                [
+                    (0, NoteLetter::C, Accidental::Natural),
+                    (2, NoteLetter::D, Accidental::Natural),
+                    (4, NoteLetter::E, Accidental::Natural),
+                    (5, NoteLetter::F, Accidental::Natural),
+                    (7, NoteLetter::G, Accidental::Natural),
+                    (9, NoteLetter::A, Accidental::Natural),
+                    (11, NoteLetter::B, Accidental::Natural),
+                    (12, NoteLetter::C, Accidental::Natural),
+                    (14, NoteLetter::D, Accidental::Natural),
+                    (16, NoteLetter::E, Accidental::Natural),
+                    (17, NoteLetter::F, Accidental::Natural),
+                    (19, NoteLetter::G, Accidental::Natural),
+                    (21, NoteLetter::A, Accidental::Natural),
+                    (23, NoteLetter::B, Accidental::Natural),
+                    (24, NoteLetter::C, Accidental::Natural),
+                ],
+            ),
+            (
+                ScaleMode::Major,
+                59,
+                [
+                    (11, NoteLetter::B, Accidental::Natural),
+                    (13, NoteLetter::C, Accidental::Sharp),
+                    (15, NoteLetter::D, Accidental::Sharp),
+                    (16, NoteLetter::E, Accidental::Natural),
+                    (18, NoteLetter::F, Accidental::Sharp),
+                    (20, NoteLetter::G, Accidental::Sharp),
+                    (22, NoteLetter::A, Accidental::Sharp),
+                    (23, NoteLetter::B, Accidental::Natural),
+                    (25, NoteLetter::C, Accidental::Sharp),
+                    (27, NoteLetter::D, Accidental::Sharp),
+                    (28, NoteLetter::E, Accidental::Natural),
+                    (30, NoteLetter::F, Accidental::Sharp),
+                    (32, NoteLetter::G, Accidental::Sharp),
+                    (34, NoteLetter::A, Accidental::Sharp),
+                    (35, NoteLetter::B, Accidental::Natural),
+                ],
+            ),
+            (
+                ScaleMode::Minor,
+                58,
+                [
+                    (10, NoteLetter::B, Accidental::Flat),
+                    (12, NoteLetter::C, Accidental::Natural),
+                    (13, NoteLetter::D, Accidental::Flat),
+                    (15, NoteLetter::E, Accidental::Flat),
+                    (17, NoteLetter::F, Accidental::Natural),
+                    (18, NoteLetter::G, Accidental::Flat),
+                    (20, NoteLetter::A, Accidental::Flat),
+                    (22, NoteLetter::B, Accidental::Flat),
+                    (24, NoteLetter::C, Accidental::Natural),
+                    (25, NoteLetter::D, Accidental::Flat),
+                    (27, NoteLetter::E, Accidental::Flat),
+                    (29, NoteLetter::F, Accidental::Natural),
+                    (30, NoteLetter::G, Accidental::Flat),
+                    (32, NoteLetter::A, Accidental::Flat),
+                    (34, NoteLetter::B, Accidental::Flat),
+                ],
+            ),
+            (
+                ScaleMode::Minor,
+                60,
+                [
+                    (0, NoteLetter::C, Accidental::Natural),
+                    (2, NoteLetter::D, Accidental::Natural),
+                    (3, NoteLetter::E, Accidental::Flat),
+                    (5, NoteLetter::F, Accidental::Natural),
+                    (7, NoteLetter::G, Accidental::Natural),
+                    (8, NoteLetter::A, Accidental::Flat),
+                    (10, NoteLetter::B, Accidental::Flat),
+                    (12, NoteLetter::C, Accidental::Natural),
+                    (14, NoteLetter::D, Accidental::Natural),
+                    (15, NoteLetter::E, Accidental::Flat),
+                    (17, NoteLetter::F, Accidental::Natural),
+                    (19, NoteLetter::G, Accidental::Natural),
+                    (20, NoteLetter::A, Accidental::Flat),
+                    (22, NoteLetter::B, Accidental::Flat),
+                    (24, NoteLetter::C, Accidental::Natural),
+                ],
+            ),
+        ] {
+            let rooted = scale.rooted(NoteName::name_of(root));
+            let values = rooted
+                .all_diatonic_notes()
+                .take(letters.len())
+                .collect::<Vec<_>>();
+            for i in 0..letters.len() {
+                let (pitch, letter, modifier) = letters[i];
+                let name = NoteName {letter, modifier};
+                assert_eq!(values[i], (pitch, name));
             }
         }
     }
