@@ -1,7 +1,7 @@
 use crate::Chord;
+use midi_fundsp::note_velocity_from;
 use midi_msg::MidiMsg;
 use midi_note_recorder::midi_msg_from;
-use midi_fundsp::note_velocity_from;
 use rand::prelude::*;
 
 pub fn random_durations_from(
