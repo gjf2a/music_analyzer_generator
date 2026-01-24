@@ -138,6 +138,19 @@ impl NoteName {
         Self { letter, modifier }
     }
 
+    pub fn full_name_for(letter: NoteLetter, pitch: u8) -> Self {
+        let offset = letter.steps_above_natural(pitch);
+        Self {
+            letter,
+            modifier: match offset {
+                -1 => Accidental::Flat,
+                0 => Accidental::Natural,
+                1 => Accidental::Sharp,
+                _ => panic!("Offset {offset} beyond +/- 1 undefined"),
+            },
+        }   
+    }
+
     pub fn lowest_midi_note(&self) -> u8 {
         self.modifier
             .pitch_shift(self.letter.natural_pitch())
@@ -330,8 +343,10 @@ impl DoubleEndedIterator for ScaleLetterIterator {
 pub struct RootedScale {
     mode: ScaleMode,
     root: NoteName,
-    notes2letters: BTreeMap<u8, NoteLetter>,
-    notes2names: BTreeMap<u8, NoteName>,
+    notes2letters_up: BTreeMap<u8, NoteLetter>,
+    notes2names_up: BTreeMap<u8, NoteName>,
+    notes2letters_down: BTreeMap<u8, NoteLetter>,
+    notes2names_down: BTreeMap<u8, NoteName>,
 }
 
 impl RootedScale {
@@ -339,44 +354,56 @@ impl RootedScale {
         let mut result = Self {
             mode,
             root,
-            notes2letters: BTreeMap::default(),
-            notes2names: BTreeMap::default(),
+            notes2letters_up: BTreeMap::default(),
+            notes2names_up: BTreeMap::default(),
+            notes2letters_down: BTreeMap::default(),
+            notes2names_down: BTreeMap::default(),
         };
-        let notes2letters = result.all_diatonic_note_letters().collect();
-        result.notes2letters = notes2letters;
-        let notes2names = result.all_diatonic_notes().collect();
-        result.notes2names = notes2names;
+        let notes2letters_up = result.all_diatonic_note_letters_up().collect();
+        result.notes2letters_up = notes2letters_up;
+        let notes2names = result.all_diatonic_notes_up().collect();
+        result.notes2names_up = notes2names;
+        let notes2letters_down = result.all_diatonic_note_letters_down().collect();
+        result.notes2letters_down = notes2letters_down;
+        let notes2names_down = result.all_diatonic_notes_down().collect();
+        result.notes2names_down = notes2names_down;
         result
     }
 
-    pub fn all_diatonic_note_letters(&self) -> impl Iterator<Item = (u8, NoteLetter)> {
+    pub fn all_diatonic_note_letters_up(&self) -> impl Iterator<Item = (u8, NoteLetter)> {
         self.notes_going_up().zip(self.mode.letter_iterator(self.root.letter))
     }
 
-    pub fn all_diatonic_notes(&self) -> impl Iterator<Item = (u8, NoteName)> {
-        self.all_diatonic_note_letters().map(|(pitch, letter)| {
-            let offset = letter.steps_above_natural(pitch);
-            (
-                pitch,
-                NoteName {
-                    letter,
-                    modifier: match offset {
-                        -1 => Accidental::Flat,
-                        0 => Accidental::Natural,
-                        1 => Accidental::Sharp,
-                        _ => panic!("Offset {offset} beyond +/- 1 undefined"),
-                    },
-                },
-            )
+    pub fn all_diatonic_notes_up(&self) -> impl Iterator<Item = (u8, NoteName)> {
+        self.all_diatonic_note_letters_up().map(|(pitch, letter)| {
+            (pitch, NoteName::full_name_for(letter, pitch))
+        })
+    }
+
+    pub fn all_diatonic_note_letters_down(&self) -> impl Iterator<Item = (u8, NoteLetter)> {
+        self.notes_going_down().zip(self.mode.letter_iterator(self.root.letter).rev())
+    }
+
+    pub fn all_diatonic_notes_down(&self) -> impl Iterator<Item = (u8, NoteName)> {
+        self.all_diatonic_note_letters_down().map(|(pitch, letter)| {
+            (pitch, NoteName::full_name_for(letter, pitch))
         })
     }
 
     pub fn contains(&self, note: u8) -> bool {
-        self.notes2letters.contains_key(&note)
+        self.notes2letters_down.contains_key(&note)
+    }
+
+    pub fn contains_ascending(&self, note: u8) -> bool {
+        self.notes2letters_up.contains_key(&note)
     }
 
     pub fn name_of(&self, pitch: u8) -> Option<NoteName> {
-        self.notes2names.get(&pitch).copied()
+        self.notes2names_down.get(&pitch).copied()
+    }
+
+    pub fn name_of_ascending(&self, pitch: u8) -> Option<NoteName> {
+        self.notes2names_up.get(&pitch).copied()
     }
 
     pub fn middle_c(&self) -> u8 {
@@ -384,14 +411,14 @@ impl RootedScale {
     }
 
     pub fn all_sharps(&self) -> impl Iterator<Item = NoteLetter> {
-        self.all_diatonic_notes()
+        self.all_diatonic_notes_down()
             .take(7)
             .filter(|(_, n)| n.modifier == Accidental::Sharp)
             .map(|(_, n)| n.letter)
     }
 
     pub fn all_flats(&self) -> impl Iterator<Item = NoteLetter> {
-        self.all_diatonic_notes()
+        self.all_diatonic_notes_down()
             .take(7)
             .filter(|(_, n)| n.modifier == Accidental::Flat)
             .map(|(_, n)| n.letter)
@@ -1313,7 +1340,7 @@ B  Major ([59, 63, 66])";
         ] {
             let rooted = scale.rooted(NoteName::name_of(root));
             let values = rooted
-                .all_diatonic_note_letters()
+                .all_diatonic_note_letters_up()
                 .take(letters.len())
                 .collect::<Vec<_>>();
             for i in 0..letters.len() {
@@ -1412,7 +1439,7 @@ B  Major ([59, 63, 66])";
         ] {
             let rooted = scale.rooted(NoteName::name_of(root));
             let values = rooted
-                .all_diatonic_notes()
+                .all_diatonic_notes_up()
                 .take(letters.len())
                 .collect::<Vec<_>>();
             for i in 0..letters.len() {
@@ -1430,24 +1457,24 @@ B  Major ([59, 63, 66])";
             (
                 ScaleMode::Minor,
                 60,
-                vec![NoteLetter::E, NoteLetter::A, NoteLetter::B],
+                vec![NoteLetter::B, NoteLetter::A, NoteLetter::E],
             ),
             (ScaleMode::Major, 62, vec![]),
             (ScaleMode::Major, 17, vec![NoteLetter::B]),
             (
                 ScaleMode::Minor,
                 17,
-                vec![NoteLetter::A, NoteLetter::B, NoteLetter::D, NoteLetter::E],
+                vec![NoteLetter::E, NoteLetter::D, NoteLetter::B, NoteLetter::A],
             ),
             (
                 ScaleMode::Major,
                 61,
                 vec![
                     NoteLetter::D,
-                    NoteLetter::E,
-                    NoteLetter::G,
-                    NoteLetter::A,
                     NoteLetter::B,
+                    NoteLetter::A,
+                    NoteLetter::G,
+                    NoteLetter::E,
                 ],
             ),
         ] {
@@ -1461,16 +1488,16 @@ B  Major ([59, 63, 66])";
         for (scale, root, target) in [
             (ScaleMode::Major, 60, vec![]),
             (ScaleMode::Minor, 60, vec![]),
-            (ScaleMode::Major, 62, vec![NoteLetter::F, NoteLetter::C]),
+            (ScaleMode::Major, 62, vec![NoteLetter::C, NoteLetter::F]),
             (
                 ScaleMode::Major,
                 59,
                 vec![
-                    NoteLetter::C,
-                    NoteLetter::D,
-                    NoteLetter::F,
-                    NoteLetter::G,
                     NoteLetter::A,
+                    NoteLetter::G,
+                    NoteLetter::F,
+                    NoteLetter::D,
+                    NoteLetter::C,
                 ],
             ),
             (
@@ -1478,11 +1505,11 @@ B  Major ([59, 63, 66])";
                 18,
                 vec![
                     NoteLetter::F,
-                    NoteLetter::G,
-                    NoteLetter::A,
-                    NoteLetter::C,
-                    NoteLetter::D,
                     NoteLetter::E,
+                    NoteLetter::D,
+                    NoteLetter::C,
+                    NoteLetter::A,
+                    NoteLetter::G,
                 ],
             ),
         ] {
@@ -1496,10 +1523,10 @@ B  Major ([59, 63, 66])";
         for (scale, root, note, expected) in [
             (ScaleMode::Major, 60, 61, Some((60, 62))),
             (ScaleMode::Minor, 69, 61, Some((60, 62))),
-            /*(ScaleMode::Major, 67, 73, Some((72, 74))),
+            (ScaleMode::Major, 67, 73, Some((72, 74))),
             (ScaleMode::Major, 67, 72, None),
             (ScaleMode::Augmented, 60, 65, Some((64, 67))),
-            (ScaleMode::Augmented, 60, 66, Some((64, 67))),*/
+            (ScaleMode::Augmented, 60, 66, Some((64, 67))),
         ] {
             let rooted = scale.rooted(NoteName::name_of(root));
             assert_eq!(expected, rooted.diatonic_bracket_for(note));
@@ -1517,5 +1544,10 @@ B  Major ([59, 63, 66])";
             let letters = scale.letter_iterator(letter).take(9).collect::<Vec<_>>();
             assert_eq!(expected, letters);
         }
+    }
+
+    #[test]
+    fn test_diatonic_descending() {
+
     }
 }
