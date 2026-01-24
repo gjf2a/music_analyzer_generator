@@ -665,6 +665,7 @@ name = "music_analyzer_generator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bare_metal_modulo",
  "crossbeam-queue",
  "crossbeam-utils",
  "enum-iterator",

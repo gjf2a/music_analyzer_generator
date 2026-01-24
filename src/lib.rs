@@ -5,6 +5,7 @@ use std::{
     fmt::Display,
 };
 
+use bare_metal_modulo::{MNum, ModNum};
 use enum_iterator::{Sequence, all};
 use midi_fundsp::note_velocity_from;
 use midi_msg::MidiMsg;
@@ -256,6 +257,44 @@ impl ScaleMode {
         }
     }
 
+    fn letter_iterator(&self, root_letter: NoteLetter) -> ScaleLetterIterator {
+        let mut letter_seq = all::<NoteLetter>().cycle().skip_while(|nl| *nl != root_letter).take(7).collect::<Vec<_>>();
+        match self {
+            Self::WholeTone => {
+                letter_seq.pop();
+            }
+            Self::Augmented => {
+                letter_seq.remove(5);
+                letter_seq[3] = letter_seq[4];
+            }
+            Self::Diminished => {
+                letter_seq.insert(4, letter_seq[4]);
+            }
+            _ => {}
+        }
+        ScaleLetterIterator {
+            pos: ModNum::new(0, letter_seq.len()),
+            letter_seq,
+        }
+    }
+
+    fn notes_going_up(&self, note: NoteName) -> impl Iterator<Item = u8> {
+        ScaleUpIterator {
+            pattern: self.pattern_up(),
+            current: note.lowest_midi_note(),
+            count: 0,
+        }
+    }
+
+    fn notes_going_down(&self, note: NoteName) -> impl Iterator<Item = u8> {
+        let root_note = note.lowest_midi_note();
+        ScaleDownIterator {
+            pattern: self.pattern_down(),
+            current: root_note + if root_note > 7 { 108 } else { 120 },
+            count: 0,
+        }
+    }
+
     fn pattern_down(&self) -> ScalePattern {
         match self {
             Self::MelodicMinor => ScalePattern::mode_rotation(5),
@@ -265,10 +304,34 @@ impl ScaleMode {
     }
 }
 
+struct ScaleLetterIterator {
+    pos: ModNum<usize>,
+    letter_seq: Vec<NoteLetter>,
+}
+
+impl Iterator for ScaleLetterIterator {
+    type Item = NoteLetter;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = self.letter_seq[self.pos.a()];
+        self.pos += 1;
+        Some(result)
+    }
+}
+
+impl DoubleEndedIterator for ScaleLetterIterator {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let result = self.letter_seq[self.pos.a()];
+        self.pos -= 1;
+        Some(result)
+    }
+}
+
 pub struct RootedScale {
     mode: ScaleMode,
     root: NoteName,
     notes2letters: BTreeMap<u8, NoteLetter>,
+    notes2names: BTreeMap<u8, NoteName>,
 }
 
 impl RootedScale {
@@ -277,23 +340,17 @@ impl RootedScale {
             mode,
             root,
             notes2letters: BTreeMap::default(),
+            notes2names: BTreeMap::default(),
         };
         let notes2letters = result.all_diatonic_note_letters().collect();
         result.notes2letters = notes2letters;
+        let notes2names = result.all_diatonic_notes().collect();
+        result.notes2names = notes2names;
         result
     }
 
     pub fn all_diatonic_note_letters(&self) -> impl Iterator<Item = (u8, NoteLetter)> {
-        let mut letters = all::<NoteLetter>().cycle().peekable();
-        loop {
-            let letter = letters.peek().unwrap();
-            if *letter == self.root.letter {
-                break;
-            } else {
-                letters.next();
-            }
-        }
-        self.notes_going_up().zip(letters)
+        self.notes_going_up().zip(self.mode.letter_iterator(self.root.letter))
     }
 
     pub fn all_diatonic_notes(&self) -> impl Iterator<Item = (u8, NoteName)> {
@@ -316,6 +373,10 @@ impl RootedScale {
 
     pub fn contains(&self, note: u8) -> bool {
         self.notes2letters.contains_key(&note)
+    }
+
+    pub fn name_of(&self, pitch: u8) -> Option<NoteName> {
+        self.notes2names.get(&pitch).copied()
     }
 
     pub fn middle_c(&self) -> u8 {
@@ -351,20 +412,11 @@ impl RootedScale {
     }
 
     pub fn notes_going_up(&self) -> impl Iterator<Item = u8> {
-        ScaleUpIterator {
-            pattern: self.mode.pattern_up(),
-            current: self.root.lowest_midi_note(),
-            count: 0,
-        }
+        self.mode.notes_going_up(self.root)
     }
 
     pub fn notes_going_down(&self) -> impl Iterator<Item = u8> {
-        let root_note = self.root.lowest_midi_note();
-        ScaleDownIterator {
-            pattern: self.mode.pattern_down(),
-            current: root_note + if root_note > 7 { 108 } else { 120 },
-            count: 0,
-        }
+        self.mode.notes_going_down(self.root)
     }
 
     pub fn note_up(&self, current: u8, interval: usize) -> Option<u8> {
@@ -379,6 +431,16 @@ impl RootedScale {
             .skip_while(|n| *n > current)
             .skip(interval - 1)
             .next()
+    }
+
+    pub fn diatonic_bracket_for(&self, pitch: u8) -> Option<(u8, u8)> {
+        if self.contains(pitch) {
+            None
+        } else {
+            let below = self.round_down(pitch);
+            let above = self.round_up(pitch);
+            Some((below, above))
+        }
     }
 
     pub fn diatonic_steps_between(&self, pitch_1: u8, pitch_2: u8) -> Option<u8> {
@@ -1426,6 +1488,34 @@ B  Major ([59, 63, 66])";
         ] {
             let rooted = scale.rooted(NoteName::name_of(root));
             assert_eq!(target, rooted.all_sharps().collect::<Vec<_>>());
+        }
+    }
+
+    #[test]
+    fn test_diatonic_bracket() {
+        for (scale, root, note, expected) in [
+            (ScaleMode::Major, 60, 61, Some((60, 62))),
+            (ScaleMode::Minor, 69, 61, Some((60, 62))),
+            /*(ScaleMode::Major, 67, 73, Some((72, 74))),
+            (ScaleMode::Major, 67, 72, None),
+            (ScaleMode::Augmented, 60, 65, Some((64, 67))),
+            (ScaleMode::Augmented, 60, 66, Some((64, 67))),*/
+        ] {
+            let rooted = scale.rooted(NoteName::name_of(root));
+            assert_eq!(expected, rooted.diatonic_bracket_for(note));
+        }    
+    }
+
+    #[test]
+    fn test_mode_iterator() {
+        for (scale, letter, expected) in [
+            (ScaleMode::Major, NoteLetter::D, vec![NoteLetter::D, NoteLetter::E, NoteLetter::F, NoteLetter::G, NoteLetter::A, NoteLetter::B, NoteLetter::C, NoteLetter::D, NoteLetter::E]),
+            (ScaleMode::Minor, NoteLetter::A, vec![NoteLetter::A, NoteLetter::B, NoteLetter::C, NoteLetter::D, NoteLetter::E, NoteLetter::F, NoteLetter::G, NoteLetter::A, NoteLetter::B]),
+            (ScaleMode::Dorian, NoteLetter::F, vec![NoteLetter::F, NoteLetter::G, NoteLetter::A, NoteLetter::B, NoteLetter::C, NoteLetter::D, NoteLetter::E, NoteLetter::F, NoteLetter::G]),
+            (ScaleMode::Augmented, NoteLetter::C, vec![NoteLetter::C, NoteLetter::D, NoteLetter::E, NoteLetter::G, NoteLetter::G, NoteLetter::B, NoteLetter::C, NoteLetter::D, NoteLetter::E]),
+        ] {
+            let letters = scale.letter_iterator(letter).take(9).collect::<Vec<_>>();
+            assert_eq!(expected, letters);
         }
     }
 }
