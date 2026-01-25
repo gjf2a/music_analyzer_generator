@@ -178,7 +178,7 @@ impl NoteName {
                 2 => Accidental::DoubleSharp,
                 _ => panic!("Offset {offset} beyond +/- 2 undefined"),
             },
-        }   
+        }
     }
 
     pub fn lowest_midi_note(&self) -> u8 {
@@ -301,7 +301,11 @@ impl ScaleMode {
     }
 
     fn letter_iterator(&self, root_letter: NoteLetter) -> ScaleLetterIterator {
-        let mut letter_seq = all::<NoteLetter>().cycle().skip_while(|nl| *nl != root_letter).take(7).collect::<Vec<_>>();
+        let mut letter_seq = all::<NoteLetter>()
+            .cycle()
+            .skip_while(|nl| *nl != root_letter)
+            .take(7)
+            .collect::<Vec<_>>();
         match self {
             Self::WholeTone => {
                 letter_seq.pop();
@@ -401,23 +405,23 @@ impl RootedScale {
     }
 
     pub fn all_diatonic_note_letters_up(&self) -> impl Iterator<Item = (u8, NoteLetter)> {
-        self.notes_going_up().zip(self.mode.letter_iterator(self.root.letter))
+        self.notes_going_up()
+            .zip(self.mode.letter_iterator(self.root.letter))
     }
 
     pub fn all_diatonic_notes_up(&self) -> impl Iterator<Item = (u8, NoteName)> {
-        self.all_diatonic_note_letters_up().map(|(pitch, letter)| {
-            (pitch, NoteName::full_name_for(letter, pitch))
-        })
+        self.all_diatonic_note_letters_up()
+            .map(|(pitch, letter)| (pitch, NoteName::full_name_for(letter, pitch)))
     }
 
     pub fn all_diatonic_note_letters_down(&self) -> impl Iterator<Item = (u8, NoteLetter)> {
-        self.notes_going_down().zip(self.mode.letter_iterator(self.root.letter).rev())
+        self.notes_going_down()
+            .zip(self.mode.letter_iterator(self.root.letter).rev())
     }
 
     pub fn all_diatonic_notes_down(&self) -> impl Iterator<Item = (u8, NoteName)> {
-        self.all_diatonic_note_letters_down().map(|(pitch, letter)| {
-            (pitch, NoteName::full_name_for(letter, pitch))
-        })
+        self.all_diatonic_note_letters_down()
+            .map(|(pitch, letter)| (pitch, NoteName::full_name_for(letter, pitch)))
     }
 
     pub fn contains(&self, note: u8) -> bool {
@@ -1029,7 +1033,8 @@ mod tests {
     use rand::Rng;
 
     use crate::{
-        Accidental, ActivePitches, MAJOR_ROOT_IDS, MINOR_ROOT_IDS, NoteLetter, NoteName, PitchSequence, ScaleMode
+        Accidental, ActivePitches, MAJOR_ROOT_IDS, MINOR_ROOT_IDS, NoteLetter, NoteName,
+        PitchSequence, ScaleMode,
     };
 
     #[test]
@@ -1560,16 +1565,72 @@ B  Major ([59, 63, 66])";
         ] {
             let rooted = scale.rooted(NoteName::name_of(root));
             assert_eq!(expected, rooted.diatonic_bracket_for(note));
-        }    
+        }
     }
 
     #[test]
     fn test_mode_iterator() {
         for (scale, letter, expected) in [
-            (ScaleMode::Major, NoteLetter::D, vec![NoteLetter::D, NoteLetter::E, NoteLetter::F, NoteLetter::G, NoteLetter::A, NoteLetter::B, NoteLetter::C, NoteLetter::D, NoteLetter::E]),
-            (ScaleMode::Minor, NoteLetter::A, vec![NoteLetter::A, NoteLetter::B, NoteLetter::C, NoteLetter::D, NoteLetter::E, NoteLetter::F, NoteLetter::G, NoteLetter::A, NoteLetter::B]),
-            (ScaleMode::Dorian, NoteLetter::F, vec![NoteLetter::F, NoteLetter::G, NoteLetter::A, NoteLetter::B, NoteLetter::C, NoteLetter::D, NoteLetter::E, NoteLetter::F, NoteLetter::G]),
-            (ScaleMode::Augmented, NoteLetter::C, vec![NoteLetter::C, NoteLetter::D, NoteLetter::E, NoteLetter::G, NoteLetter::G, NoteLetter::B, NoteLetter::C, NoteLetter::D, NoteLetter::E]),
+            (
+                ScaleMode::Major,
+                NoteLetter::D,
+                vec![
+                    NoteLetter::D,
+                    NoteLetter::E,
+                    NoteLetter::F,
+                    NoteLetter::G,
+                    NoteLetter::A,
+                    NoteLetter::B,
+                    NoteLetter::C,
+                    NoteLetter::D,
+                    NoteLetter::E,
+                ],
+            ),
+            (
+                ScaleMode::Minor,
+                NoteLetter::A,
+                vec![
+                    NoteLetter::A,
+                    NoteLetter::B,
+                    NoteLetter::C,
+                    NoteLetter::D,
+                    NoteLetter::E,
+                    NoteLetter::F,
+                    NoteLetter::G,
+                    NoteLetter::A,
+                    NoteLetter::B,
+                ],
+            ),
+            (
+                ScaleMode::Dorian,
+                NoteLetter::F,
+                vec![
+                    NoteLetter::F,
+                    NoteLetter::G,
+                    NoteLetter::A,
+                    NoteLetter::B,
+                    NoteLetter::C,
+                    NoteLetter::D,
+                    NoteLetter::E,
+                    NoteLetter::F,
+                    NoteLetter::G,
+                ],
+            ),
+            (
+                ScaleMode::Augmented,
+                NoteLetter::C,
+                vec![
+                    NoteLetter::C,
+                    NoteLetter::D,
+                    NoteLetter::E,
+                    NoteLetter::G,
+                    NoteLetter::G,
+                    NoteLetter::B,
+                    NoteLetter::C,
+                    NoteLetter::D,
+                    NoteLetter::E,
+                ],
+            ),
         ] {
             let letters = scale.letter_iterator(letter).take(9).collect::<Vec<_>>();
             assert_eq!(expected, letters);
@@ -1580,7 +1641,7 @@ B  Major ([59, 63, 66])";
     fn test_melodic_minor() {
         for (letter, modifier) in MINOR_ROOT_IDS.iter().copied() {
             println!("New loop: {letter:?} {modifier:?}");
-            let root = NoteName {letter, modifier};
+            let root = NoteName { letter, modifier };
             let scale = ScaleMode::MelodicMinor.rooted(root);
             let mut ups = scale.all_diatonic_notes_up().collect::<VecDeque<_>>();
             let mut dns = scale.all_diatonic_notes_down().collect::<VecDeque<_>>();
@@ -1610,7 +1671,10 @@ B  Major ([59, 63, 66])";
                     assert_eq!(ups[ui], dns[di]);
                 } else {
                     assert_eq!(ups[ui].0, dns[di].0 + 1);
-                    assert_eq!(ups[ui].1.modifier.offset_value(), dns[di].1.modifier.offset_value() + 1);
+                    assert_eq!(
+                        ups[ui].1.modifier.offset_value(),
+                        dns[di].1.modifier.offset_value() + 1
+                    );
                 }
             }
         }
