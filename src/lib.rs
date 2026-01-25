@@ -90,34 +90,62 @@ const MINOR_ROOT_IDS: [(NoteLetter, Accidental); 12] = [
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Accidental {
+    DoubleFlat,
     Flat,
     Natural,
     Sharp,
+    DoubleSharp,
 }
 
 impl Accidental {
     pub fn symbol(&self) -> char {
         match self {
-            Accidental::Flat => '\u{266d}',
+            Self::DoubleFlat => '\u{1d12b}',
+            Self::Flat => '\u{266d}',
             //Accidental::Natural => '\u{266e}',
-            Accidental::Natural => ' ',
-            Accidental::Sharp => '\u{266f}',
+            Self::Natural => ' ',
+            Self::Sharp => '\u{266f}',
+            Self::DoubleSharp => '\u{1d12a}',
+        }
+    }
+
+    pub fn offset_value(&self) -> i16 {
+        match self {
+            Self::DoubleFlat => -2,
+            Self::Flat => -1,
+            Self::Natural => 0,
+            Self::Sharp => 1,
+            Self::DoubleSharp => 2,
         }
     }
 
     pub fn pitch_shift(&self, natural: u8) -> Option<u8> {
         match self {
-            Accidental::Flat => {
+            Self::DoubleFlat => {
+                if natural > 1 {
+                    Some(natural - 2)
+                } else {
+                    None
+                }
+            }
+            Self::Flat => {
                 if natural > 0 {
                     Some(natural - 1)
                 } else {
                     None
                 }
             }
-            Accidental::Natural => Some(natural),
-            Accidental::Sharp => {
+            Self::Natural => Some(natural),
+            Self::Sharp => {
                 if natural < u8::MAX {
                     Some(natural + 1)
+                } else {
+                    None
+                }
+            }
+            Self::DoubleSharp => {
+                if natural + 1 < u8::MAX {
+                    Some(natural + 2)
                 } else {
                     None
                 }
@@ -143,10 +171,12 @@ impl NoteName {
         Self {
             letter,
             modifier: match offset {
+                -2 => Accidental::DoubleFlat,
                 -1 => Accidental::Flat,
                 0 => Accidental::Natural,
                 1 => Accidental::Sharp,
-                _ => panic!("Offset {offset} beyond +/- 1 undefined"),
+                2 => Accidental::DoubleSharp,
+                _ => panic!("Offset {offset} beyond +/- 2 undefined"),
             },
         }   
     }
@@ -992,14 +1022,14 @@ impl ClosedInterval {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
+    use std::collections::{BTreeSet, VecDeque};
 
     use midi_msg::Channel;
     use midi_note_recorder::{Recording, midi_msg_from};
     use rand::Rng;
 
     use crate::{
-        Accidental, ActivePitches, MAJOR_ROOT_IDS, NoteLetter, NoteName, PitchSequence, ScaleMode,
+        Accidental, ActivePitches, MAJOR_ROOT_IDS, MINOR_ROOT_IDS, NoteLetter, NoteName, PitchSequence, ScaleMode
     };
 
     #[test]
@@ -1547,7 +1577,42 @@ B  Major ([59, 63, 66])";
     }
 
     #[test]
-    fn test_diatonic_descending() {
-
+    fn test_melodic_minor() {
+        for (letter, modifier) in MINOR_ROOT_IDS.iter().copied() {
+            println!("New loop: {letter:?} {modifier:?}");
+            let root = NoteName {letter, modifier};
+            let scale = ScaleMode::MelodicMinor.rooted(root);
+            let mut ups = scale.all_diatonic_notes_up().collect::<VecDeque<_>>();
+            let mut dns = scale.all_diatonic_notes_down().collect::<VecDeque<_>>();
+            while ups[ups.len() - 1] != dns[0] {
+                ups.pop_back();
+            }
+            while ups[0] != dns[dns.len() - 1] && ups[0].0 < dns[dns.len() - 1].0 {
+                println!("{:?} {:?} {}", ups[0], dns[dns.len() - 1], ups.len());
+                ups.pop_front();
+            }
+            while ups[0] != dns[dns.len() - 1] && ups[0].0 > dns[dns.len() - 1].0 {
+                dns.pop_back();
+            }
+            while ups[0].1.letter != letter {
+                ups.pop_front();
+                dns.pop_back();
+            }
+            while dns[0].1.letter != letter {
+                ups.pop_back();
+                dns.pop_front();
+            }
+            assert_eq!(ups.len(), dns.len());
+            for ui in 0..ups.len() {
+                let di = dns.len() - ui - 1;
+                assert_eq!(ups[ui].1.letter, dns[di].1.letter);
+                if ui % 7 < 5 {
+                    assert_eq!(ups[ui], dns[di]);
+                } else {
+                    assert_eq!(ups[ui].0, dns[di].0 + 1);
+                    assert_eq!(ups[ui].1.modifier.offset_value(), dns[di].1.modifier.offset_value() + 1);
+                }
+            }
+        }
     }
 }
