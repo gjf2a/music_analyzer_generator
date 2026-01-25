@@ -1,4 +1,3 @@
-pub mod generator;
 
 use std::{
     collections::{BTreeMap, VecDeque},
