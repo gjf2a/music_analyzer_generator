@@ -109,6 +109,26 @@ impl Accidental {
         }
     }
 
+    pub fn sharpen(&self) -> Option<Self> {
+        match self {
+            Self::DoubleFlat => Some(Self::Flat),
+            Self::Flat => Some(Self::Natural),
+            Self::Natural => Some(Self::Sharp),
+            Self::Sharp => Some(Self::DoubleSharp),
+            Self::DoubleSharp => None,
+        }
+    }
+
+    pub fn flatten(&self) -> Option<Self> {
+        match self {
+            Self::DoubleFlat => None,
+            Self::Flat => Some(Self::DoubleFlat),
+            Self::Natural => Some(Self::Flat),
+            Self::Sharp => Some(Self::Natural),
+            Self::DoubleSharp => Some(Self::Sharp),
+        }
+    }
+
     pub fn offset_value(&self) -> i16 {
         match self {
             Self::DoubleFlat => -2,
@@ -459,17 +479,20 @@ impl RootedScale {
     }
 
     pub fn round_up(&self, pitch: u8) -> u8 {
-        self.notes_going_up()
-            .skip_while(|n| *n < pitch)
-            .next()
-            .unwrap()
+        assert!(pitch <= *self.notes2letters_down.last_key_value().unwrap().0);
+        let mut rounded = pitch;
+        while !self.contains(rounded) {
+            rounded += 1;
+        }
+        rounded
     }
 
     pub fn round_down(&self, pitch: u8) -> u8 {
-        self.notes_going_down()
-            .skip_while(|n| *n > pitch)
-            .next()
-            .unwrap()
+        let mut rounded = pitch;
+        while !self.contains(rounded) {
+            rounded -= 1;
+        }
+        rounded
     }
 
     pub fn notes_going_up(&self) -> impl Iterator<Item = u8> {
@@ -523,6 +546,41 @@ impl RootedScale {
             }
         }
     }
+
+    pub fn descending_match(&self, pitch: u8) -> (NoteName, u8, Option<Accidental>) {
+        if let Some((down, up)) = self.diatonic_bracket_for(pitch) {
+            let down_name = self.name_of(down).unwrap();
+            let up_name = self.name_of(up).unwrap();
+            let down_modifier = down_name.modifier.sharpen();
+            let up_modifier = up_name.modifier.flatten();
+            if let Some(up_modifier) = up_modifier {
+                if up_modifier.offset_value() > -2 {
+                    return (up_name, up, Some(up_modifier));
+                }
+            }
+            (down_name, down, down_modifier)
+        } else {
+            (self.name_of(pitch).unwrap(), pitch, None)
+        }
+    }
+
+    pub fn ascending_match(&self, pitch: u8) -> (NoteName, u8, Option<Accidental>) {
+        if let Some((down, up)) = self.diatonic_bracket_for(pitch) {
+            let down_name = self.name_of(down).unwrap();
+            let up_name = self.name_of(up).unwrap();
+            let down_modifier = down_name.modifier.sharpen();
+            let up_modifier = up_name.modifier.flatten();
+            if let Some(down_modifier) = down_modifier {
+                if down_modifier.offset_value() < 2 {
+                    return (down_name, down, Some(down_modifier));
+                }
+            }
+            (up_name, up, up_modifier)
+        } else {
+            (self.name_of(pitch).unwrap(), pitch, None)
+        }
+    }
+
     /*
     /// Returns 0 for the Middle C/C#/Cb position.
     /// Returns positive numbers for the treble clef.
@@ -1560,6 +1618,7 @@ B  Major ([59, 63, 66])";
             (ScaleMode::Minor, 69, 61, Some((60, 62))),
             (ScaleMode::Major, 67, 73, Some((72, 74))),
             (ScaleMode::Major, 67, 72, None),
+            (ScaleMode::Major, 59, 67, Some((66, 68))),
             (ScaleMode::Augmented, 60, 65, Some((64, 67))),
             (ScaleMode::Augmented, 60, 66, Some((64, 67))),
         ] {
@@ -1677,6 +1736,120 @@ B  Major ([59, 63, 66])";
                     );
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_ascending_match() {
+        for (
+            scale,
+            root,
+            pitch,
+            expected_letter,
+            expected_modifier,
+            expected_pitch,
+            expected_ascend,
+        ) in [
+            (
+                ScaleMode::Major,
+                60,
+                72,
+                NoteLetter::C,
+                Accidental::Natural,
+                72,
+                None,
+            ),
+            (
+                ScaleMode::Major,
+                60,
+                73,
+                NoteLetter::C,
+                Accidental::Natural,
+                72,
+                Some(Accidental::Sharp),
+            ),
+            (
+                ScaleMode::Major,
+                59,
+                65,
+                NoteLetter::E,
+                Accidental::Natural,
+                64,
+                Some(Accidental::Sharp),
+            ),
+            (
+                ScaleMode::Major,
+                59,
+                67,
+                NoteLetter::G,
+                Accidental::Sharp,
+                68,
+                Some(Accidental::Natural),
+            ),
+        ] {
+            let rooted = scale.rooted(NoteName::name_of(root));
+            let (name, diatonic_pitch, ascend) = rooted.ascending_match(pitch);
+            assert_eq!(expected_letter, name.letter);
+            assert_eq!(expected_modifier, name.modifier);
+            assert_eq!(expected_pitch, diatonic_pitch);
+            assert_eq!(expected_ascend, ascend);
+        }
+    }
+
+    #[test]
+    fn test_descending_match() {
+        for (
+            scale,
+            root,
+            pitch,
+            expected_letter,
+            expected_modifier,
+            expected_pitch,
+            expected_descend,
+        ) in [
+            (
+                ScaleMode::Major,
+                60,
+                72,
+                NoteLetter::C,
+                Accidental::Natural,
+                72,
+                None,
+            ),
+            (
+                ScaleMode::Major,
+                60,
+                73,
+                NoteLetter::D,
+                Accidental::Natural,
+                74,
+                Some(Accidental::Flat),
+            ),
+            (
+                ScaleMode::Major,
+                61,
+                71,
+                NoteLetter::C,
+                Accidental::Natural,
+                72,
+                Some(Accidental::Flat),
+            ),
+            (
+                ScaleMode::Major,
+                61,
+                69,
+                NoteLetter::A,
+                Accidental::Flat,
+                68,
+                Some(Accidental::Natural),
+            ),
+        ] {
+            let rooted = scale.rooted(NoteName::name_of(root));
+            let (name, diatonic_pitch, descend) = rooted.descending_match(pitch);
+            assert_eq!(expected_letter, name.letter);
+            assert_eq!(expected_modifier, name.modifier);
+            assert_eq!(expected_pitch, diatonic_pitch);
+            assert_eq!(expected_descend, descend);
         }
     }
 }
