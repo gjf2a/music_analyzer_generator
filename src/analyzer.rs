@@ -3,6 +3,7 @@ use enum_iterator::all;
 use crate::{ChordName, NoteName, PitchSequence, RootedScale, ScaleMode};
 use midi_note_recorder::Recording;
 
+#[derive(Debug)]
 pub struct ChordProgression {
     chords_starts: Vec<(ChordName, f64)>,
 }
@@ -18,6 +19,26 @@ impl ChordProgression {
 
     pub fn len(&self) -> usize {
         self.chords_starts.len()
+    }
+
+    pub fn num_mismatched_chords(&self, scale: &RootedScale) -> usize {
+        self.chord_iter()
+            .filter(|chord| chord.missing_chord_tones_from(&scale).len() > 0)
+            .count()
+    }
+
+    pub fn scale_mismatches_for(&self) -> Vec<(usize, RootedScale)> {
+        let mut result = vec![];
+        for mode in all::<ScaleMode>() {
+            for pitch in 60..72 {
+                let root = NoteName::name_of(pitch);
+                let scale = mode.rooted(root);
+                let mismatched = self.num_mismatched_chords(&scale);
+                result.push((mismatched, scale));
+            }
+        }
+        result.sort_by_key(|(count, _)| *count);
+        result
     }
 }
 
@@ -36,30 +57,73 @@ impl From<&Recording> for ChordProgression {
     }
 }
 
-pub fn num_mismatched_chords<P: Iterator<Item = ChordName>>(
-    scale: &RootedScale,
-    progression: P,
-) -> usize {
-    progression
-        .filter(|chord| chord.missing_chord_tones_from(&scale).len() > 0)
-        .count()
-}
+mod tests {
+    use midi_note_recorder::Recording;
 
-pub fn scale_mismatches_for<P: Iterator<Item = ChordName>>(
-    progression: P,
-) -> Vec<(usize, RootedScale)> {
-    let mut result = vec![];
-    let progression = progression.collect::<Vec<_>>();
-    for mode in all::<ScaleMode>() {
-        for pitch in 60..72 {
-            let root = NoteName::name_of(pitch);
-            let scale = mode.rooted(root);
-            let mismatched = num_mismatched_chords(&scale, progression.iter().copied());
-            result.push((mismatched, scale));
+    use crate::NoteName;
+    use crate::analyzer::ChordProgression;
+
+    //use crate::Accidental::Flat as F;
+    use crate::Accidental::Natural as N;
+    use crate::Accidental::Sharp as S;
+    //use crate::ChordMode as CM;
+    use crate::NoteLetter as NL;
+    use crate::ScaleMode as SM;
+
+    #[test]
+    fn test_healing_progression() {
+        let recording: Recording = Recording::from_file("healing4").unwrap();
+        let progression = ChordProgression::from(&recording);
+        let mismatches = progression.scale_mismatches_for();
+        let readable = mismatches
+            .iter()
+            .map(|(c, r)| (*c, r.mode, r.root))
+            .collect::<Vec<_>>();
+        let closest = vec![
+            (
+                1,
+                SM::Major,
+                NoteName {
+                    letter: NL::E,
+                    modifier: N,
+                },
+            ),
+            (
+                1,
+                SM::Dorian,
+                NoteName {
+                    letter: NL::F,
+                    modifier: S,
+                },
+            ),
+            (
+                1,
+                SM::Lydian,
+                NoteName {
+                    letter: NL::A,
+                    modifier: N,
+                },
+            ),
+            (
+                1,
+                SM::Mixolydian,
+                NoteName {
+                    letter: NL::B,
+                    modifier: N,
+                },
+            ),
+            (
+                1,
+                SM::MelodicMinor,
+                NoteName {
+                    letter: NL::F,
+                    modifier: S,
+                },
+            ),
+        ];
+
+        for i in 0..closest.len() {
+            assert_eq!(closest[i], readable[i]);
         }
     }
-    result.sort_by_key(|(count, _)| *count);
-    result
 }
-
-mod tests {}

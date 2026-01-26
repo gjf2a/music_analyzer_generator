@@ -325,7 +325,7 @@ impl ChordName {
     }
 }
 
-#[derive(Copy, Clone, Debug, Sequence)]
+#[derive(Copy, Clone, Debug, Sequence, Eq, PartialEq)]
 pub enum ScaleMode {
     Major,
     Minor,
@@ -446,6 +446,7 @@ impl DoubleEndedIterator for ScaleLetterIterator {
     }
 }
 
+#[derive(Debug)]
 pub struct RootedScale {
     mode: ScaleMode,
     root: NoteName,
