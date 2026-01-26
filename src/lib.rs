@@ -1,3 +1,4 @@
+pub mod analyzer;
 
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -238,8 +239,8 @@ impl Display for Chord {
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct ChordName {
-    note: NoteLetter,
-    accidental: Accidental,
+    letter: NoteLetter,
+    modifier: Accidental,
     mode: ChordMode,
 }
 
@@ -248,26 +249,53 @@ impl Display for ChordName {
         write!(
             f,
             "{:?}{} {:?}",
-            self.note,
-            self.accidental.symbol(),
+            self.letter,
+            self.modifier.symbol(),
             self.mode
         )
     }
 }
 
 impl ChordName {
-    pub fn new(active: ActivePitches) -> Option<Self> {
+    pub fn from_active_pitches(active: ActivePitches) -> Option<Self> {
         SimpleChordInfo::new(active).map(|info| info.mode())
     }
 
+    pub fn root_name(&self) -> NoteName {
+        NoteName {
+            letter: self.letter,
+            modifier: self.modifier,
+        }
+    }
+
+    pub fn note_names(&self) -> Vec<NoteName> {
+        let rs = self.mode.note_name_scale().rooted(self.root_name());
+        let mut result = rs.all_diatonic_notes_up()
+            .enumerate()
+            .filter(|(i, _)| i % 2 == 0)
+            .map(|(_, (_, n))| n)
+            .take(self.mode.num_chord_notes())
+            .collect::<Vec<_>>();
+        if self.mode == ChordMode::Diminished7 {
+            let end = result.len() - 1;
+            result[end].modifier = result[end].modifier.flatten().unwrap();
+        }
+        result
+    }
+
     pub fn compact_name(&self) -> String {
-        let base_note_letter = format!("{:?}{}", self.note, self.accidental.symbol());
+        let base_note_letter = format!("{:?}{}", self.letter, self.modifier.symbol());
         let note_letter = base_note_letter.trim();
         match self.mode {
             ChordMode::Major => note_letter.to_owned(),
             ChordMode::Minor => format!("{note_letter}m"),
             ChordMode::Diminished => format!("{note_letter}\u{00b0}"),
             ChordMode::Augmented => format!("{note_letter}+"),
+            ChordMode::Dominant7 => format!("{note_letter}7"),
+            ChordMode::Major7 => format!("{note_letter}maj7"),
+            ChordMode::Minor7 => format!("{note_letter}m7"),
+            ChordMode::Diminished7 => format!("{note_letter}\u{00b0}7"),
+            ChordMode::HalfDiminished7 => format!("{note_letter}\u{00f8}7"),
         }
     }
 }
@@ -714,8 +742,8 @@ impl SimpleChordInfo {
         if first == 3 {
             let (note, accidental) = MINOR_ROOT_IDS[self.root_pitch_index()];
             ChordName {
-                note,
-                accidental,
+                letter: note,
+                modifier: accidental,
                 mode: if second == 3 {
                     ChordMode::Diminished
                 } else {
@@ -725,8 +753,8 @@ impl SimpleChordInfo {
         } else {
             let (note, accidental) = MAJOR_ROOT_IDS[self.root_pitch_index()];
             ChordName {
-                note,
-                accidental,
+                letter: note,
+                modifier: accidental,
                 mode: if second == 3 {
                     ChordMode::Major
                 } else {
@@ -743,21 +771,32 @@ pub enum ChordMode {
     Minor,
     Diminished,
     Augmented,
+    Dominant7,
+    Major7,
+    Minor7,
+    Diminished7,
+    HalfDiminished7,
 }
 
 impl ChordMode {
-    pub fn scales(&self) -> Vec<ScaleMode> {
+    fn note_name_scale(&self) -> ScaleMode {
         match self {
-            ChordMode::Major => vec![ScaleMode::Major, ScaleMode::Lydian, ScaleMode::Mixolydian],
-            ChordMode::Minor => vec![
-                ScaleMode::Minor,
-                ScaleMode::MelodicMinor,
-                ScaleMode::HarmonicMinor,
-                ScaleMode::Dorian,
-                ScaleMode::Phrygian,
-            ],
-            ChordMode::Diminished => vec![ScaleMode::Diminished],
-            ChordMode::Augmented => vec![ScaleMode::Augmented, ScaleMode::WholeTone],
+            Self::Major => ScaleMode::Major,
+            Self::Minor => ScaleMode::Minor,
+            Self::Diminished => ScaleMode::Locrian,
+            Self::Augmented => ScaleMode::WholeTone,
+            Self::Dominant7 => ScaleMode::Mixolydian,
+            Self::Major7 => ScaleMode::Major,
+            Self::Minor7 => ScaleMode::Minor,
+            Self::Diminished7 => ScaleMode::Locrian,
+            Self::HalfDiminished7 => ScaleMode::Locrian,
+        }
+    }
+
+    fn num_chord_notes(&self) -> usize {
+        match self {
+            Self::Major | Self::Minor | Self::Diminished | Self::Augmented => 3,
+            Self::Dominant7 | Self::Major7 | Self::Minor7 | Self::Diminished7 | Self::HalfDiminished7 => 4,
         }
     }
 }
@@ -868,7 +907,7 @@ impl PitchSequence {
         let mut result = vec![];
         let mut last_time = 0.0;
         for (t, _, p) in self.seq.iter() {
-            if let Some(name) = ChordName::new(*p) {
+            if let Some(name) = ChordName::from_active_pitches(*p) {
                 if let Some((chord, time)) = pending {
                     result.push((chord, time, *t - time));
                     last_time = time;
@@ -1090,8 +1129,8 @@ mod tests {
     use rand::Rng;
 
     use crate::{
-        Accidental, ActivePitches, MAJOR_ROOT_IDS, MINOR_ROOT_IDS, NoteLetter, NoteName,
-        PitchSequence, ScaleMode,
+        Accidental, ActivePitches, ChordMode, ChordName, MAJOR_ROOT_IDS, MINOR_ROOT_IDS,
+        NoteLetter, NoteName, PitchSequence, ScaleMode,
     };
 
     #[test]
@@ -1849,6 +1888,73 @@ B  Major ([59, 63, 66])";
             assert_eq!(expected_modifier, name.modifier);
             assert_eq!(expected_pitch, diatonic_pitch);
             assert_eq!(expected_descend, descend);
+        }
+    }
+
+    #[test]
+    fn test_chord_notes() {
+        for (letter, modifier, mode, notes) in [(
+            NoteLetter::C,
+            Accidental::Natural,
+            ChordMode::Major,
+            vec![
+                (NoteLetter::C, Accidental::Natural),
+                (NoteLetter::E, Accidental::Natural),
+                (NoteLetter::G, Accidental::Natural),
+            ],
+        ),
+        (NoteLetter::D, Accidental::Natural, ChordMode::Major, vec![
+            (NoteLetter::D, Accidental::Natural),
+            (NoteLetter::F, Accidental::Sharp),
+            (NoteLetter::A, Accidental::Natural)
+        ]
+        ),
+        (NoteLetter::E, Accidental::Flat, ChordMode::Major, vec![
+            (NoteLetter::E, Accidental::Flat),
+            (NoteLetter::G, Accidental::Natural),
+            (NoteLetter::B, Accidental::Flat)
+        ]),
+        (NoteLetter::G, Accidental::Natural, ChordMode::Dominant7, vec![
+            (NoteLetter::G, Accidental::Natural),
+            (NoteLetter::B, Accidental::Natural),
+            (NoteLetter::D, Accidental::Natural),
+            (NoteLetter::F, Accidental::Natural),
+        ]),
+        (NoteLetter::G, Accidental::Natural, ChordMode::Minor, vec![
+            (NoteLetter::G, Accidental::Natural),
+            (NoteLetter::B, Accidental::Flat),
+            (NoteLetter::D, Accidental::Natural),
+        ]),
+        (NoteLetter::G, Accidental::Natural, ChordMode::Minor7, vec![
+            (NoteLetter::G, Accidental::Natural),
+            (NoteLetter::B, Accidental::Flat),
+            (NoteLetter::D, Accidental::Natural),
+            (NoteLetter::F, Accidental::Natural),
+        ]),
+        (NoteLetter::G, Accidental::Natural, ChordMode::HalfDiminished7, vec![
+            (NoteLetter::G, Accidental::Natural),
+            (NoteLetter::B, Accidental::Flat),
+            (NoteLetter::D, Accidental::Flat),
+            (NoteLetter::F, Accidental::Natural),
+        ]),
+        (NoteLetter::G, Accidental::Sharp, ChordMode::Diminished7, vec![
+            (NoteLetter::G, Accidental::Sharp),
+            (NoteLetter::B, Accidental::Natural),
+            (NoteLetter::D, Accidental::Natural),
+            (NoteLetter::F, Accidental::Natural),
+        ]),
+        ] {
+            let chord_name = ChordName {
+                letter,
+                modifier,
+                mode,
+            };
+            let expected = notes
+                .iter()
+                .copied()
+                .map(|(letter, modifier)| NoteName { letter, modifier })
+                .collect::<Vec<_>>();
+            assert_eq!(expected, chord_name.note_names());
         }
     }
 }
