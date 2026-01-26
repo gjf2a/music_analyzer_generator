@@ -82,71 +82,41 @@ mod tests {
 
     #[test]
     fn test_progressions() {
-        for (filename, closest) in [(
-            "healing4",
-            vec![
-                (
-                    1,
-                    SM::Major,
-                    NoteName {
-                        letter: NL::E,
-                        modifier: N,
-                    },
-                ),
-                (
-                    1,
-                    SM::Dorian,
-                    NoteName {
-                        letter: NL::F,
-                        modifier: S,
-                    },
-                ),
-                (
-                    1,
-                    SM::Lydian,
-                    NoteName {
-                        letter: NL::A,
-                        modifier: N,
-                    },
-                ),
-                (
-                    1,
-                    SM::Mixolydian,
-                    NoteName {
-                        letter: NL::B,
-                        modifier: N,
-                    },
-                ),
-                (
-                    1,
-                    SM::MelodicMinor,
-                    NoteName {
-                        letter: NL::F,
-                        modifier: S,
-                    },
-                ),
-            ],
-        ),
-        ("take5", vec![
-            (0, SM::Major, NoteName {letter: NL::D, modifier: F}),
-            (0, SM::Major, NoteName {letter: NL::F, modifier: S}),
-            (0, SM::Minor, NoteName {letter: NL::E, modifier: F}),
-            (0, SM::Minor, NoteName {letter: NL::B, modifier: F}),
-            (0, SM::Dorian, NoteName {letter: NL::E, modifier: F}),
-            (0, SM::Dorian, NoteName {letter: NL::A, modifier: F}),
-            (0, SM::Phrygian, NoteName {letter: NL::F, modifier: N}),
-            (0, SM::Phrygian, NoteName {letter: NL::B, modifier: F}),
-            (0, SM::Lydian, NoteName {letter: NL::F, modifier: S}),
-            (0, SM::Lydian, NoteName {letter: NL::B, modifier: N}),
-            (0, SM::Mixolydian, NoteName {letter: NL::D, modifier: F}),
-            (0, SM::Mixolydian, NoteName {letter: NL::A, modifier: F}),
-            (0, SM::Locrian, NoteName {letter: NL::C, modifier: N}),
-            (0, SM::Locrian, NoteName {letter: NL::F, modifier: N}),
-            (0, SM::HarmonicMinor, NoteName {letter: NL::B, modifier: F}),
-            (0, SM::MelodicMinor, NoteName {letter: NL::E, modifier: F}),
-            (0, SM::MelodicMinor, NoteName {letter: NL::A , modifier: F}),
-            (0, SM::MelodicMinor, NoteName {letter: NL::B , modifier: F}),
-        ])] {
+        for (filename, closest) in [
+            (
+                "healing4",
+                vec![
+                    (1, SM::Major, NoteName { ltr: NL::E, acc: N }),
+                    (1, SM::Dorian, NoteName { ltr: NL::F, acc: S }),
+                    (1, SM::Lydian, NoteName { ltr: NL::A, acc: N }),
+                    (1, SM::Mixolydian, NoteName { ltr: NL::B, acc: N }),
+                    (1, SM::MelodicMinor, NoteName { ltr: NL::F, acc: S }),
+                ],
+            ),
+            (
+                "take5",
+                vec![
+                    (0, SM::Major, NoteName { ltr: NL::D, acc: F }),
+                    (0, SM::Major, NoteName { ltr: NL::F, acc: S }),
+                    (0, SM::Minor, NoteName { ltr: NL::E, acc: F }),
+                    (0, SM::Minor, NoteName { ltr: NL::B, acc: F }),
+                    (0, SM::Dorian, NoteName { ltr: NL::E, acc: F }),
+                    (0, SM::Dorian, NoteName { ltr: NL::A, acc: F }),
+                    (0, SM::Phrygian, NoteName { ltr: NL::F, acc: N }),
+                    (0, SM::Phrygian, NoteName { ltr: NL::B, acc: F }),
+                    (0, SM::Lydian, NoteName { ltr: NL::F, acc: S }),
+                    (0, SM::Lydian, NoteName { ltr: NL::B, acc: N }),
+                    (0, SM::Mixolydian, NoteName { ltr: NL::D, acc: F }),
+                    (0, SM::Mixolydian, NoteName { ltr: NL::A, acc: F }),
+                    (0, SM::Locrian, NoteName { ltr: NL::C, acc: N }),
+                    (0, SM::Locrian, NoteName { ltr: NL::F, acc: N }),
+                    (0, SM::HarmonicMinor, NoteName { ltr: NL::B, acc: F }),
+                    (0, SM::MelodicMinor, NoteName { ltr: NL::E, acc: F }),
+                    (0, SM::MelodicMinor, NoteName { ltr: NL::A, acc: F }),
+                    (0, SM::MelodicMinor, NoteName { ltr: NL::B, acc: F }),
+                ],
+            ),
+        ] {
             let recording: Recording = Recording::from_file(filename).unwrap();
             let progression = ChordProgression::from(&recording);
             let mismatches = progression.scale_mismatches_for();

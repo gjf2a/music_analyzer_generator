@@ -176,18 +176,21 @@ impl Accidental {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct NoteName {
-    letter: NoteLetter,
-    modifier: Accidental,
+    ltr: NoteLetter,
+    acc: Accidental,
 }
 
 impl NoteName {
     pub fn name_of(pitch: u8) -> Self {
         let (letter, modifier) = MAJOR_ROOT_IDS[(pitch % 12) as usize];
-        Self { letter, modifier }
+        Self {
+            ltr: letter,
+            acc: modifier,
+        }
     }
 
     pub fn reference_pitch(&self) -> Option<u8> {
-        self.modifier.pitch_shift(self.letter.natural_pitch())
+        self.acc.pitch_shift(self.ltr.natural_pitch())
     }
 
     pub fn synonym_of(&self, other: &NoteName) -> bool {
@@ -201,8 +204,8 @@ impl NoteName {
     pub fn full_name_for(letter: NoteLetter, pitch: u8) -> Self {
         let offset = letter.steps_above_natural(pitch);
         Self {
-            letter,
-            modifier: match offset {
+            ltr: letter,
+            acc: match offset {
                 -2 => Accidental::DoubleFlat,
                 -1 => Accidental::Flat,
                 0 => Accidental::Natural,
@@ -214,15 +217,13 @@ impl NoteName {
     }
 
     pub fn lowest_midi_note(&self) -> u8 {
-        self.modifier
-            .pitch_shift(self.letter.natural_pitch())
-            .unwrap()
+        self.acc.pitch_shift(self.ltr.natural_pitch()).unwrap()
     }
 }
 
 impl Display for NoteName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}{}", self.letter, self.modifier.symbol(),)
+        write!(f, "{:?}{}", self.ltr, self.acc.symbol(),)
     }
 }
 
@@ -287,8 +288,8 @@ impl ChordName {
 
     pub fn root_name(&self) -> NoteName {
         NoteName {
-            letter: self.letter,
-            modifier: self.modifier,
+            ltr: self.letter,
+            acc: self.modifier,
         }
     }
 
@@ -303,7 +304,7 @@ impl ChordName {
             .collect::<Vec<_>>();
         if self.mode == ChordMode::Diminished7 {
             let end = result.len() - 1;
-            result[end].modifier = result[end].modifier.flatten().unwrap();
+            result[end].acc = result[end].acc.flatten().unwrap();
         }
         result
     }
@@ -487,7 +488,7 @@ impl RootedScale {
 
     pub fn all_diatonic_note_letters_up(&self) -> impl Iterator<Item = (u8, NoteLetter)> {
         self.notes_going_up()
-            .zip(self.mode.letter_iterator(self.root.letter))
+            .zip(self.mode.letter_iterator(self.root.ltr))
     }
 
     pub fn all_diatonic_notes_up(&self) -> impl Iterator<Item = (u8, NoteName)> {
@@ -497,7 +498,7 @@ impl RootedScale {
 
     pub fn all_diatonic_note_letters_down(&self) -> impl Iterator<Item = (u8, NoteLetter)> {
         self.notes_going_down()
-            .zip(self.mode.letter_iterator(self.root.letter).rev())
+            .zip(self.mode.letter_iterator(self.root.ltr).rev())
     }
 
     pub fn all_diatonic_notes_down(&self) -> impl Iterator<Item = (u8, NoteName)> {
@@ -532,15 +533,15 @@ impl RootedScale {
     pub fn all_sharps(&self) -> impl Iterator<Item = NoteLetter> {
         self.all_diatonic_notes_down()
             .take(7)
-            .filter(|(_, n)| n.modifier == Accidental::Sharp)
-            .map(|(_, n)| n.letter)
+            .filter(|(_, n)| n.acc == Accidental::Sharp)
+            .map(|(_, n)| n.ltr)
     }
 
     pub fn all_flats(&self) -> impl Iterator<Item = NoteLetter> {
         self.all_diatonic_notes_down()
             .take(7)
-            .filter(|(_, n)| n.modifier == Accidental::Flat)
-            .map(|(_, n)| n.letter)
+            .filter(|(_, n)| n.acc == Accidental::Flat)
+            .map(|(_, n)| n.ltr)
     }
 
     pub fn round_up(&self, pitch: u8) -> u8 {
@@ -616,8 +617,8 @@ impl RootedScale {
         if let Some((down, up)) = self.diatonic_bracket_for(pitch) {
             let down_name = self.name_of(down).unwrap();
             let up_name = self.name_of(up).unwrap();
-            let down_modifier = down_name.modifier.sharpen();
-            let up_modifier = up_name.modifier.flatten();
+            let down_modifier = down_name.acc.sharpen();
+            let up_modifier = up_name.acc.flatten();
             if let Some(up_modifier) = up_modifier {
                 if up_modifier.offset_value() > -2 {
                     return (up_name, up, Some(up_modifier));
@@ -633,8 +634,8 @@ impl RootedScale {
         if let Some((down, up)) = self.diatonic_bracket_for(pitch) {
             let down_name = self.name_of(down).unwrap();
             let up_name = self.name_of(up).unwrap();
-            let down_modifier = down_name.modifier.sharpen();
-            let up_modifier = up_name.modifier.flatten();
+            let down_modifier = down_name.acc.sharpen();
+            let up_modifier = up_name.acc.flatten();
             if let Some(down_modifier) = down_modifier {
                 if down_modifier.offset_value() < 2 {
                     return (down_name, down, Some(down_modifier));
@@ -1198,16 +1199,13 @@ mod tests {
             (71, NL::B, N),
         ];
         for (pitch, letter, modifier) in note_name {
-            assert_eq!(NoteName::name_of(pitch), NoteName { letter, modifier });
+            assert_eq!(NoteName::name_of(pitch), NoteName { ltr, acc });
         }
     }
 
     #[test]
     fn test_ascending_scale() {
-        let scale = SM::Major.rooted(NoteName {
-            letter: NL::C,
-            modifier: N,
-        });
+        let scale = SM::Major.rooted(NoteName { ltr: NL::C, acc: N });
         let c_notes = scale.notes_going_up().collect::<Vec<_>>();
         assert_eq!(
             c_notes[..15],
@@ -1218,10 +1216,7 @@ mod tests {
     #[test]
     fn test_descending_scale() {
         let c_notes = SM::Major
-            .rooted(NoteName {
-                letter: NL::C,
-                modifier: N,
-            })
+            .rooted(NoteName { ltr: NL::C, acc: N })
             .notes_going_down()
             .collect::<Vec<_>>();
         assert_eq!(
@@ -1234,18 +1229,9 @@ mod tests {
 
     #[test]
     fn test_note_up() {
-        let root1 = NoteName {
-            letter: NL::C,
-            modifier: N,
-        };
-        let root2 = NoteName {
-            letter: NL::F,
-            modifier: S,
-        };
-        let root3 = NoteName {
-            letter: NL::B,
-            modifier: F,
-        };
+        let root1 = NoteName { ltr: NL::C, acc: N };
+        let root2 = NoteName { ltr: NL::F, acc: S };
+        let root3 = NoteName { ltr: NL::B, acc: F };
         for (root, mode, current, interval, expected) in [
             (root1, SM::Major, 60, 3, 64),
             (root1, SM::Minor, 60, 3, 63),
@@ -1261,18 +1247,9 @@ mod tests {
 
     #[test]
     fn test_note_down() {
-        let root1 = NoteName {
-            letter: NL::C,
-            modifier: N,
-        };
-        let root2 = NoteName {
-            letter: NL::F,
-            modifier: S,
-        };
-        let root3 = NoteName {
-            letter: NL::B,
-            modifier: F,
-        };
+        let root1 = NoteName { ltr: NL::C, acc: N };
+        let root2 = NoteName { ltr: NL::F, acc: S };
+        let root3 = NoteName { ltr: NL::B, acc: F };
         for (root, mode, current, interval, expected) in [
             (root1, SM::Major, 60, 3, 57),
             (root1, SM::Minor, 60, 3, 56),
@@ -1383,8 +1360,8 @@ B  Major ([59, 63, 66])";
         let expected = [60, 60, 61, 60, 61, 60, 61, 60, 60, 61, 60, 61];
         for i in 0..expected.len() {
             let note = NoteName {
-                letter: MAJOR_ROOT_IDS[i].0,
-                modifier: MAJOR_ROOT_IDS[i].1,
+                ltr: MAJOR_ROOT_IDS[i].0,
+                acc: MAJOR_ROOT_IDS[i].1,
             };
             assert_eq!(expected[i], SM::Major.rooted(note).middle_c());
         }
@@ -1617,7 +1594,10 @@ B  Major ([59, 63, 66])";
                 .collect::<Vec<_>>();
             for i in 0..letters.len() {
                 let (pitch, letter, modifier) = letters[i];
-                let name = NoteName { letter, modifier };
+                let name = NoteName {
+                    ltr: letter,
+                    acc: modifier,
+                };
                 assert_eq!(values[i], (pitch, name));
             }
         }
@@ -1745,7 +1725,10 @@ B  Major ([59, 63, 66])";
     fn test_melodic_minor() {
         for (letter, modifier) in MINOR_ROOT_IDS.iter().copied() {
             println!("New loop: {letter:?} {modifier:?}");
-            let root = NoteName { letter, modifier };
+            let root = NoteName {
+                ltr: letter,
+                acc: modifier,
+            };
             let scale = SM::MelodicMinor.rooted(root);
             let mut ups = scale.all_diatonic_notes_up().collect::<VecDeque<_>>();
             let mut dns = scale.all_diatonic_notes_down().collect::<VecDeque<_>>();
@@ -1759,25 +1742,25 @@ B  Major ([59, 63, 66])";
             while ups[0] != dns[dns.len() - 1] && ups[0].0 > dns[dns.len() - 1].0 {
                 dns.pop_back();
             }
-            while ups[0].1.letter != letter {
+            while ups[0].1.ltr != letter {
                 ups.pop_front();
                 dns.pop_back();
             }
-            while dns[0].1.letter != letter {
+            while dns[0].1.ltr != letter {
                 ups.pop_back();
                 dns.pop_front();
             }
             assert_eq!(ups.len(), dns.len());
             for ui in 0..ups.len() {
                 let di = dns.len() - ui - 1;
-                assert_eq!(ups[ui].1.letter, dns[di].1.letter);
+                assert_eq!(ups[ui].1.ltr, dns[di].1.ltr);
                 if ui % 7 < 5 {
                     assert_eq!(ups[ui], dns[di]);
                 } else {
                     assert_eq!(ups[ui].0, dns[di].0 + 1);
                     assert_eq!(
-                        ups[ui].1.modifier.offset_value(),
-                        dns[di].1.modifier.offset_value() + 1
+                        ups[ui].1.acc.offset_value(),
+                        dns[di].1.acc.offset_value() + 1
                     );
                 }
             }
@@ -1802,8 +1785,8 @@ B  Major ([59, 63, 66])";
         ] {
             let rooted = scale.rooted(NoteName::name_of(root));
             let (name, diatonic_pitch, ascend) = rooted.ascending_match(pitch);
-            assert_eq!(expected_letter, name.letter);
-            assert_eq!(expected_modifier, name.modifier);
+            assert_eq!(expected_letter, name.ltr);
+            assert_eq!(expected_modifier, name.acc);
             assert_eq!(expected_pitch, diatonic_pitch);
             assert_eq!(expected_ascend, ascend);
         }
@@ -1827,8 +1810,8 @@ B  Major ([59, 63, 66])";
         ] {
             let rooted = scale.rooted(NoteName::name_of(root));
             let (name, diatonic_pitch, descend) = rooted.descending_match(pitch);
-            assert_eq!(expected_letter, name.letter);
-            assert_eq!(expected_modifier, name.modifier);
+            assert_eq!(expected_letter, name.ltr);
+            assert_eq!(expected_modifier, name.acc);
             assert_eq!(expected_pitch, diatonic_pitch);
             assert_eq!(expected_descend, descend);
         }
@@ -1900,7 +1883,10 @@ B  Major ([59, 63, 66])";
             let expected = notes
                 .iter()
                 .copied()
-                .map(|(letter, modifier)| NoteName { letter, modifier })
+                .map(|(letter, modifier)| NoteName {
+                    ltr: letter,
+                    acc: modifier,
+                })
                 .collect::<Vec<_>>();
             assert_eq!(expected, chord_name.note_names());
         }
@@ -1918,8 +1904,8 @@ B  Major ([59, 63, 66])";
             let chord_root = NoteName::name_of(chord_root);
             let scale_root = NoteName::name_of(scale_root);
             let chord_name = ChordName {
-                letter: chord_root.letter,
-                modifier: chord_root.modifier,
+                letter: chord_root.ltr,
+                modifier: chord_root.acc,
                 mode: chord_mode,
             };
             let rooted_scale = scale_mode.rooted(scale_root);
@@ -1927,7 +1913,10 @@ B  Major ([59, 63, 66])";
             let expected_missing = expected
                 .iter()
                 .copied()
-                .map(|(letter, modifier)| NoteName { letter, modifier })
+                .map(|(letter, modifier)| NoteName {
+                    ltr: letter,
+                    acc: modifier,
+                })
                 .collect::<Vec<_>>();
             assert_eq!(expected_missing, missing);
         }
