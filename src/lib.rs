@@ -270,7 +270,8 @@ impl ChordName {
 
     pub fn note_names(&self) -> Vec<NoteName> {
         let rs = self.mode.note_name_scale().rooted(self.root_name());
-        let mut result = rs.all_diatonic_notes_up()
+        let mut result = rs
+            .all_diatonic_notes_up()
             .enumerate()
             .filter(|(i, _)| i % 2 == 0)
             .map(|(_, (_, n))| n)
@@ -796,7 +797,11 @@ impl ChordMode {
     fn num_chord_notes(&self) -> usize {
         match self {
             Self::Major | Self::Minor | Self::Diminished | Self::Augmented => 3,
-            Self::Dominant7 | Self::Major7 | Self::Minor7 | Self::Diminished7 | Self::HalfDiminished7 => 4,
+            Self::Dominant7
+            | Self::Major7
+            | Self::Minor7
+            | Self::Diminished7
+            | Self::HalfDiminished7 => 4,
         }
     }
 }
@@ -1893,56 +1898,102 @@ B  Major ([59, 63, 66])";
 
     #[test]
     fn test_chord_notes() {
-        for (letter, modifier, mode, notes) in [(
-            NoteLetter::C,
-            Accidental::Natural,
-            ChordMode::Major,
-            vec![
-                (NoteLetter::C, Accidental::Natural),
-                (NoteLetter::E, Accidental::Natural),
-                (NoteLetter::G, Accidental::Natural),
-            ],
-        ),
-        (NoteLetter::D, Accidental::Natural, ChordMode::Major, vec![
-            (NoteLetter::D, Accidental::Natural),
-            (NoteLetter::F, Accidental::Sharp),
-            (NoteLetter::A, Accidental::Natural)
-        ]
-        ),
-        (NoteLetter::E, Accidental::Flat, ChordMode::Major, vec![
-            (NoteLetter::E, Accidental::Flat),
-            (NoteLetter::G, Accidental::Natural),
-            (NoteLetter::B, Accidental::Flat)
-        ]),
-        (NoteLetter::G, Accidental::Natural, ChordMode::Dominant7, vec![
-            (NoteLetter::G, Accidental::Natural),
-            (NoteLetter::B, Accidental::Natural),
-            (NoteLetter::D, Accidental::Natural),
-            (NoteLetter::F, Accidental::Natural),
-        ]),
-        (NoteLetter::G, Accidental::Natural, ChordMode::Minor, vec![
-            (NoteLetter::G, Accidental::Natural),
-            (NoteLetter::B, Accidental::Flat),
-            (NoteLetter::D, Accidental::Natural),
-        ]),
-        (NoteLetter::G, Accidental::Natural, ChordMode::Minor7, vec![
-            (NoteLetter::G, Accidental::Natural),
-            (NoteLetter::B, Accidental::Flat),
-            (NoteLetter::D, Accidental::Natural),
-            (NoteLetter::F, Accidental::Natural),
-        ]),
-        (NoteLetter::G, Accidental::Natural, ChordMode::HalfDiminished7, vec![
-            (NoteLetter::G, Accidental::Natural),
-            (NoteLetter::B, Accidental::Flat),
-            (NoteLetter::D, Accidental::Flat),
-            (NoteLetter::F, Accidental::Natural),
-        ]),
-        (NoteLetter::G, Accidental::Sharp, ChordMode::Diminished7, vec![
-            (NoteLetter::G, Accidental::Sharp),
-            (NoteLetter::B, Accidental::Natural),
-            (NoteLetter::D, Accidental::Natural),
-            (NoteLetter::F, Accidental::Natural),
-        ]),
+        for (letter, modifier, mode, notes) in [
+            (
+                NoteLetter::C,
+                Accidental::Natural,
+                ChordMode::Major,
+                vec![
+                    (NoteLetter::C, Accidental::Natural),
+                    (NoteLetter::E, Accidental::Natural),
+                    (NoteLetter::G, Accidental::Natural),
+                ],
+            ),
+            (
+                NoteLetter::D,
+                Accidental::Natural,
+                ChordMode::Major,
+                vec![
+                    (NoteLetter::D, Accidental::Natural),
+                    (NoteLetter::F, Accidental::Sharp),
+                    (NoteLetter::A, Accidental::Natural),
+                ],
+            ),
+            (
+                NoteLetter::E,
+                Accidental::Flat,
+                ChordMode::Major,
+                vec![
+                    (NoteLetter::E, Accidental::Flat),
+                    (NoteLetter::G, Accidental::Natural),
+                    (NoteLetter::B, Accidental::Flat),
+                ],
+            ),
+            (
+                NoteLetter::G,
+                Accidental::Natural,
+                ChordMode::Dominant7,
+                vec![
+                    (NoteLetter::G, Accidental::Natural),
+                    (NoteLetter::B, Accidental::Natural),
+                    (NoteLetter::D, Accidental::Natural),
+                    (NoteLetter::F, Accidental::Natural),
+                ],
+            ),
+            (
+                NoteLetter::G,
+                Accidental::Natural,
+                ChordMode::Minor,
+                vec![
+                    (NoteLetter::G, Accidental::Natural),
+                    (NoteLetter::B, Accidental::Flat),
+                    (NoteLetter::D, Accidental::Natural),
+                ],
+            ),
+            (
+                NoteLetter::G,
+                Accidental::Natural,
+                ChordMode::Minor7,
+                vec![
+                    (NoteLetter::G, Accidental::Natural),
+                    (NoteLetter::B, Accidental::Flat),
+                    (NoteLetter::D, Accidental::Natural),
+                    (NoteLetter::F, Accidental::Natural),
+                ],
+            ),
+            (
+                NoteLetter::G,
+                Accidental::Natural,
+                ChordMode::HalfDiminished7,
+                vec![
+                    (NoteLetter::G, Accidental::Natural),
+                    (NoteLetter::B, Accidental::Flat),
+                    (NoteLetter::D, Accidental::Flat),
+                    (NoteLetter::F, Accidental::Natural),
+                ],
+            ),
+            (
+                NoteLetter::G,
+                Accidental::Sharp,
+                ChordMode::Diminished7,
+                vec![
+                    (NoteLetter::G, Accidental::Sharp),
+                    (NoteLetter::B, Accidental::Natural),
+                    (NoteLetter::D, Accidental::Natural),
+                    (NoteLetter::F, Accidental::Natural),
+                ],
+            ),
+            (
+                NoteLetter::G,
+                Accidental::Natural,
+                ChordMode::Diminished7,
+                vec![
+                    (NoteLetter::G, Accidental::Natural),
+                    (NoteLetter::B, Accidental::Flat),
+                    (NoteLetter::D, Accidental::Flat),
+                    (NoteLetter::F, Accidental::Flat),
+                ],
+            ),
         ] {
             let chord_name = ChordName {
                 letter,
