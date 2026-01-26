@@ -40,6 +40,12 @@ impl ChordProgression {
         result.sort_by_key(|(count, _)| *count);
         result
     }
+
+    pub fn closest_matching_scales(&self) -> Vec<RootedScale> {
+        let mismatches = self.scale_mismatches_for();
+        let min_miss = mismatches[0].0;
+        mismatches.iter().take_while(|(c,_)| *c == min_miss).map(|(_,rs)| rs.clone()).collect()
+    }
 }
 
 impl From<&Recording> for ChordProgression {
@@ -122,8 +128,13 @@ mod tests {
             ),
         ];
 
+        let closest_match = progression.closest_matching_scales();
+        assert_eq!(closest.len(), closest_match.len());
+        
         for i in 0..closest.len() {
             assert_eq!(closest[i], readable[i]);
+            assert_eq!(closest[i].1, closest_match[i].mode);
+            assert_eq!(closest[i].2, closest_match[i].root);
         }
     }
 }

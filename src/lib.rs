@@ -446,7 +446,7 @@ impl DoubleEndedIterator for ScaleLetterIterator {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RootedScale {
     mode: ScaleMode,
     root: NoteName,
