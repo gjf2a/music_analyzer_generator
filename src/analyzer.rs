@@ -3,17 +3,37 @@ use enum_iterator::all;
 use crate::{ChordName, NoteName, PitchSequence, RootedScale, ScaleMode};
 use midi_note_recorder::Recording;
 
-pub fn chords_starts(recording: &Recording) -> Vec<(ChordName, f64)> {
-    let mut result = vec![];
-    for (chord, start, _) in PitchSequence::new(recording).chords_starts_durations() {
-        let push = result
-            .last()
-            .map_or(true, |(last_name, _)| *last_name != chord.name());
-        if push {
-            result.push((chord.name(), start));
-        }
+pub struct ChordProgression {
+    chords_starts: Vec<(ChordName, f64)>
+}
+
+impl ChordProgression {
+    pub fn chord_iter(&self) -> impl Iterator<Item=ChordName> {
+        self.chords_starts.iter().map(|(c,_)| *c)
     }
-    result
+
+    pub fn chord_start_iter(&self) -> impl Iterator<Item=(ChordName, f64)> {
+        self.chords_starts.iter().copied()
+    }
+
+    pub fn len(&self) -> usize {
+        self.chords_starts.len()
+    }
+}
+
+impl From<&Recording> for ChordProgression {
+    fn from(recording: &Recording) -> Self {
+        let mut chords_starts = vec![];
+        for (chord, start, _) in PitchSequence::new(recording).chords_starts_durations() {
+            let push = chords_starts
+                .last()
+                .map_or(true, |(last_name, _)| *last_name != chord.name());
+            if push {
+                chords_starts.push((chord.name(), start));
+            }
+        }
+        Self {chords_starts}
+    }
 }
 
 pub fn num_mismatched_chords<P: Iterator<Item = ChordName>>(
@@ -40,4 +60,6 @@ pub fn scale_mismatches_for<P: Iterator<Item = ChordName>>(progression: P) -> Ve
     result
 }
 
-mod tests {}
+mod tests {
+
+}
