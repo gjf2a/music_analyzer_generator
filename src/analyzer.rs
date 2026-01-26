@@ -21,6 +21,12 @@ impl ChordProgression {
         self.chords_starts.len()
     }
 
+    pub fn has_root_chord(&self, scale: &RootedScale) -> bool {
+        self.chord_iter().any(|chord| {
+            scale.root == chord.root_name() && chord.missing_chord_tones_from(scale).len() == 0
+        })
+    }
+
     pub fn num_mismatched_chords(&self, scale: &RootedScale) -> usize {
         self.chord_iter()
             .filter(|chord| chord.missing_chord_tones_from(&scale).len() > 0)
@@ -33,8 +39,10 @@ impl ChordProgression {
             for pitch in 60..72 {
                 let root = NoteName::name_of(pitch);
                 let scale = mode.rooted(root);
-                let mismatched = self.num_mismatched_chords(&scale);
-                result.push((mismatched, scale));
+                if self.has_root_chord(&scale) {
+                    let mismatched = self.num_mismatched_chords(&scale);
+                    result.push((mismatched, scale));
+                }
             }
         }
         result.sort_by_key(|(count, _)| *count);
@@ -87,33 +95,32 @@ mod tests {
                 "healing4",
                 vec![
                     (1, SM::Major, NoteName { ltr: NL::E, acc: N }),
-                    (1, SM::Dorian, NoteName { ltr: NL::F, acc: S }),
                     (1, SM::Lydian, NoteName { ltr: NL::A, acc: N }),
                     (1, SM::Mixolydian, NoteName { ltr: NL::B, acc: N }),
-                    (1, SM::MelodicMinor, NoteName { ltr: NL::F, acc: S }),
                 ],
             ),
             (
                 "take5",
                 vec![
-                    (0, SM::Major, NoteName { ltr: NL::D, acc: F }),
-                    (0, SM::Major, NoteName { ltr: NL::F, acc: S }),
                     (0, SM::Minor, NoteName { ltr: NL::E, acc: F }),
                     (0, SM::Minor, NoteName { ltr: NL::B, acc: F }),
                     (0, SM::Dorian, NoteName { ltr: NL::E, acc: F }),
-                    (0, SM::Dorian, NoteName { ltr: NL::A, acc: F }),
-                    (0, SM::Phrygian, NoteName { ltr: NL::F, acc: N }),
                     (0, SM::Phrygian, NoteName { ltr: NL::B, acc: F }),
-                    (0, SM::Lydian, NoteName { ltr: NL::F, acc: S }),
-                    (0, SM::Lydian, NoteName { ltr: NL::B, acc: N }),
-                    (0, SM::Mixolydian, NoteName { ltr: NL::D, acc: F }),
-                    (0, SM::Mixolydian, NoteName { ltr: NL::A, acc: F }),
-                    (0, SM::Locrian, NoteName { ltr: NL::C, acc: N }),
-                    (0, SM::Locrian, NoteName { ltr: NL::F, acc: N }),
                     (0, SM::HarmonicMinor, NoteName { ltr: NL::B, acc: F }),
                     (0, SM::MelodicMinor, NoteName { ltr: NL::E, acc: F }),
-                    (0, SM::MelodicMinor, NoteName { ltr: NL::A, acc: F }),
                     (0, SM::MelodicMinor, NoteName { ltr: NL::B, acc: F }),
+                ],
+            ),
+            (
+                "SimpleA",
+                vec![
+                    (0, SM::Major, NoteName { ltr: NL::E, acc: N }),
+                    (0, SM::Major, NoteName { ltr: NL::A, acc: N }),
+                    (0, SM::Minor, NoteName { ltr: NL::F, acc: S }),
+                    (0, SM::Dorian, NoteName { ltr: NL::F, acc: S }),
+                    (0, SM::Lydian, NoteName { ltr: NL::A, acc: N }),
+                    (0, SM::Mixolydian, NoteName { ltr: NL::E, acc: N }),
+                    (0, SM::MelodicMinor, NoteName { ltr: NL::F, acc: S }),
                 ],
             ),
         ] {
@@ -124,6 +131,7 @@ mod tests {
                 .iter()
                 .map(|(c, r)| (*c, r.mode, r.root))
                 .collect::<Vec<_>>();
+            println!("{readable:?}");
             let closest_match = progression.closest_matching_scales();
             assert_eq!(closest.len(), closest_match.len());
 
