@@ -4,15 +4,15 @@ use crate::{ChordName, NoteName, PitchSequence, RootedScale, ScaleMode};
 use midi_note_recorder::Recording;
 
 pub struct ChordProgression {
-    chords_starts: Vec<(ChordName, f64)>
+    chords_starts: Vec<(ChordName, f64)>,
 }
 
 impl ChordProgression {
-    pub fn chord_iter(&self) -> impl Iterator<Item=ChordName> {
-        self.chords_starts.iter().map(|(c,_)| *c)
+    pub fn chord_iter(&self) -> impl Iterator<Item = ChordName> {
+        self.chords_starts.iter().map(|(c, _)| *c)
     }
 
-    pub fn chord_start_iter(&self) -> impl Iterator<Item=(ChordName, f64)> {
+    pub fn chord_start_iter(&self) -> impl Iterator<Item = (ChordName, f64)> {
         self.chords_starts.iter().copied()
     }
 
@@ -32,7 +32,7 @@ impl From<&Recording> for ChordProgression {
                 chords_starts.push((chord.name(), start));
             }
         }
-        Self {chords_starts}
+        Self { chords_starts }
     }
 }
 
@@ -45,7 +45,9 @@ pub fn num_mismatched_chords<P: Iterator<Item = ChordName>>(
         .count()
 }
 
-pub fn scale_mismatches_for<P: Iterator<Item = ChordName>>(progression: P) -> Vec<(usize,RootedScale)> {
+pub fn scale_mismatches_for<P: Iterator<Item = ChordName>>(
+    progression: P,
+) -> Vec<(usize, RootedScale)> {
     let mut result = vec![];
     let progression = progression.collect::<Vec<_>>();
     for mode in all::<ScaleMode>() {
@@ -56,10 +58,8 @@ pub fn scale_mismatches_for<P: Iterator<Item = ChordName>>(progression: P) -> Ve
             result.push((mismatched, scale));
         }
     }
-    result.sort_by_key(|(count,_)| *count);
+    result.sort_by_key(|(count, _)| *count);
     result
 }
 
-mod tests {
-
-}
+mod tests {}
