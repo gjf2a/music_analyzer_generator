@@ -44,7 +44,11 @@ impl ChordProgression {
     pub fn closest_matching_scales(&self) -> Vec<RootedScale> {
         let mismatches = self.scale_mismatches_for();
         let min_miss = mismatches[0].0;
-        mismatches.iter().take_while(|(c,_)| *c == min_miss).map(|(_,rs)| rs.clone()).collect()
+        mismatches
+            .iter()
+            .take_while(|(c, _)| *c == min_miss)
+            .map(|(_, rs)| rs.clone())
+            .collect()
     }
 }
 
@@ -69,72 +73,95 @@ mod tests {
     use crate::NoteName;
     use crate::analyzer::ChordProgression;
 
-    //use crate::Accidental::Flat as F;
+    use crate::Accidental::Flat as F;
     use crate::Accidental::Natural as N;
     use crate::Accidental::Sharp as S;
-    //use crate::ChordMode as CM;
+    use crate::ChordMode as CM;
     use crate::NoteLetter as NL;
     use crate::ScaleMode as SM;
 
     #[test]
-    fn test_healing_progression() {
-        let recording: Recording = Recording::from_file("healing4").unwrap();
-        let progression = ChordProgression::from(&recording);
-        let mismatches = progression.scale_mismatches_for();
-        let readable = mismatches
-            .iter()
-            .map(|(c, r)| (*c, r.mode, r.root))
-            .collect::<Vec<_>>();
-        let closest = vec![
-            (
-                1,
-                SM::Major,
-                NoteName {
-                    letter: NL::E,
-                    modifier: N,
-                },
-            ),
-            (
-                1,
-                SM::Dorian,
-                NoteName {
-                    letter: NL::F,
-                    modifier: S,
-                },
-            ),
-            (
-                1,
-                SM::Lydian,
-                NoteName {
-                    letter: NL::A,
-                    modifier: N,
-                },
-            ),
-            (
-                1,
-                SM::Mixolydian,
-                NoteName {
-                    letter: NL::B,
-                    modifier: N,
-                },
-            ),
-            (
-                1,
-                SM::MelodicMinor,
-                NoteName {
-                    letter: NL::F,
-                    modifier: S,
-                },
-            ),
-        ];
+    fn test_progressions() {
+        for (filename, closest) in [(
+            "healing4",
+            vec![
+                (
+                    1,
+                    SM::Major,
+                    NoteName {
+                        letter: NL::E,
+                        modifier: N,
+                    },
+                ),
+                (
+                    1,
+                    SM::Dorian,
+                    NoteName {
+                        letter: NL::F,
+                        modifier: S,
+                    },
+                ),
+                (
+                    1,
+                    SM::Lydian,
+                    NoteName {
+                        letter: NL::A,
+                        modifier: N,
+                    },
+                ),
+                (
+                    1,
+                    SM::Mixolydian,
+                    NoteName {
+                        letter: NL::B,
+                        modifier: N,
+                    },
+                ),
+                (
+                    1,
+                    SM::MelodicMinor,
+                    NoteName {
+                        letter: NL::F,
+                        modifier: S,
+                    },
+                ),
+            ],
+        ),
+        ("take5", vec![
+            (0, SM::Major, NoteName {letter: NL::D, modifier: F}),
+            (0, SM::Major, NoteName {letter: NL::F, modifier: S}),
+            (0, SM::Minor, NoteName {letter: NL::E, modifier: F}),
+            (0, SM::Minor, NoteName {letter: NL::B, modifier: F}),
+            (0, SM::Dorian, NoteName {letter: NL::E, modifier: F}),
+            (0, SM::Dorian, NoteName {letter: NL::A, modifier: F}),
+            (0, SM::Phrygian, NoteName {letter: NL::F, modifier: N}),
+            (0, SM::Phrygian, NoteName {letter: NL::B, modifier: F}),
+            (0, SM::Lydian, NoteName {letter: NL::F, modifier: S}),
+            (0, SM::Lydian, NoteName {letter: NL::B, modifier: N}),
+            (0, SM::Mixolydian, NoteName {letter: NL::D, modifier: F}),
+            (0, SM::Mixolydian, NoteName {letter: NL::A, modifier: F}),
+            (0, SM::Locrian, NoteName {letter: NL::C, modifier: N}),
+            (0, SM::Locrian, NoteName {letter: NL::F, modifier: N}),
+            (0, SM::HarmonicMinor, NoteName {letter: NL::B, modifier: F}),
+            (0, SM::MelodicMinor, NoteName {letter: NL::E, modifier: F}),
+            (0, SM::MelodicMinor, NoteName {letter: NL::A , modifier: F}),
+            (0, SM::MelodicMinor, NoteName {letter: NL::B , modifier: F}),
+        ])] {
+            let recording: Recording = Recording::from_file(filename).unwrap();
+            let progression = ChordProgression::from(&recording);
+            let mismatches = progression.scale_mismatches_for();
+            let readable = mismatches
+                .iter()
+                .map(|(c, r)| (*c, r.mode, r.root))
+                .collect::<Vec<_>>();
+            let closest_match = progression.closest_matching_scales();
+            assert_eq!(closest.len(), closest_match.len());
 
-        let closest_match = progression.closest_matching_scales();
-        assert_eq!(closest.len(), closest_match.len());
-        
-        for i in 0..closest.len() {
-            assert_eq!(closest[i], readable[i]);
-            assert_eq!(closest[i].1, closest_match[i].mode);
-            assert_eq!(closest[i].2, closest_match[i].root);
+            for i in 0..closest.len() {
+                assert_eq!(closest[i], readable[i]);
+                assert_eq!(closest[i].1, closest_match[i].mode);
+                assert_eq!(closest[i].2, closest_match[i].root);
+            }
         }
     }
 }
