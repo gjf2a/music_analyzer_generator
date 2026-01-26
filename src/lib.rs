@@ -325,7 +325,7 @@ impl ChordName {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Sequence)]
 pub enum ScaleMode {
     Major,
     Minor,
@@ -1173,7 +1173,9 @@ mod tests {
         ActivePitches, ChordName, MAJOR_ROOT_IDS, MINOR_ROOT_IDS, NoteName, PitchSequence,
     };
 
-    use crate::Accidental as A;
+    use crate::Accidental::Flat as F;
+    use crate::Accidental::Natural as N;
+    use crate::Accidental::Sharp as S;
     use crate::ChordMode as CM;
     use crate::NoteLetter as NL;
     use crate::ScaleMode as SM;
@@ -1181,18 +1183,18 @@ mod tests {
     #[test]
     fn test_note_names() {
         let note_name = [
-            (60, NL::C, A::Natural),
-            (61, NL::D, A::Flat),
-            (62, NL::D, A::Natural),
-            (63, NL::E, A::Flat),
-            (64, NL::E, A::Natural),
-            (65, NL::F, A::Natural),
-            (66, NL::F, A::Sharp),
-            (67, NL::G, A::Natural),
-            (68, NL::A, A::Flat),
-            (69, NL::A, A::Natural),
-            (70, NL::B, A::Flat),
-            (71, NL::B, A::Natural),
+            (60, NL::C, N),
+            (61, NL::D, F),
+            (62, NL::D, N),
+            (63, NL::E, F),
+            (64, NL::E, N),
+            (65, NL::F, N),
+            (66, NL::F, S),
+            (67, NL::G, N),
+            (68, NL::A, F),
+            (69, NL::A, N),
+            (70, NL::B, F),
+            (71, NL::B, N),
         ];
         for (pitch, letter, modifier) in note_name {
             assert_eq!(NoteName::name_of(pitch), NoteName { letter, modifier });
@@ -1203,7 +1205,7 @@ mod tests {
     fn test_ascending_scale() {
         let scale = SM::Major.rooted(NoteName {
             letter: NL::C,
-            modifier: A::Natural,
+            modifier: N,
         });
         let c_notes = scale.notes_going_up().collect::<Vec<_>>();
         assert_eq!(
@@ -1217,7 +1219,7 @@ mod tests {
         let c_notes = SM::Major
             .rooted(NoteName {
                 letter: NL::C,
-                modifier: A::Natural,
+                modifier: N,
             })
             .notes_going_down()
             .collect::<Vec<_>>();
@@ -1233,15 +1235,15 @@ mod tests {
     fn test_note_up() {
         let root1 = NoteName {
             letter: NL::C,
-            modifier: A::Natural,
+            modifier: N,
         };
         let root2 = NoteName {
             letter: NL::F,
-            modifier: A::Sharp,
+            modifier: S,
         };
         let root3 = NoteName {
             letter: NL::B,
-            modifier: A::Flat,
+            modifier: F,
         };
         for (root, mode, current, interval, expected) in [
             (root1, SM::Major, 60, 3, 64),
@@ -1260,15 +1262,15 @@ mod tests {
     fn test_note_down() {
         let root1 = NoteName {
             letter: NL::C,
-            modifier: A::Natural,
+            modifier: N,
         };
         let root2 = NoteName {
             letter: NL::F,
-            modifier: A::Sharp,
+            modifier: S,
         };
         let root3 = NoteName {
             letter: NL::B,
-            modifier: A::Flat,
+            modifier: F,
         };
         for (root, mode, current, interval, expected) in [
             (root1, SM::Major, 60, 3, 57),
@@ -1526,84 +1528,84 @@ B  Major ([59, 63, 66])";
                 SM::Major,
                 60,
                 [
-                    (0, NL::C, A::Natural),
-                    (2, NL::D, A::Natural),
-                    (4, NL::E, A::Natural),
-                    (5, NL::F, A::Natural),
-                    (7, NL::G, A::Natural),
-                    (9, NL::A, A::Natural),
-                    (11, NL::B, A::Natural),
-                    (12, NL::C, A::Natural),
-                    (14, NL::D, A::Natural),
-                    (16, NL::E, A::Natural),
-                    (17, NL::F, A::Natural),
-                    (19, NL::G, A::Natural),
-                    (21, NL::A, A::Natural),
-                    (23, NL::B, A::Natural),
-                    (24, NL::C, A::Natural),
+                    (0, NL::C, N),
+                    (2, NL::D, N),
+                    (4, NL::E, N),
+                    (5, NL::F, N),
+                    (7, NL::G, N),
+                    (9, NL::A, N),
+                    (11, NL::B, N),
+                    (12, NL::C, N),
+                    (14, NL::D, N),
+                    (16, NL::E, N),
+                    (17, NL::F, N),
+                    (19, NL::G, N),
+                    (21, NL::A, N),
+                    (23, NL::B, N),
+                    (24, NL::C, N),
                 ],
             ),
             (
                 SM::Major,
                 59,
                 [
-                    (11, NL::B, A::Natural),
-                    (13, NL::C, A::Sharp),
-                    (15, NL::D, A::Sharp),
-                    (16, NL::E, A::Natural),
-                    (18, NL::F, A::Sharp),
-                    (20, NL::G, A::Sharp),
-                    (22, NL::A, A::Sharp),
-                    (23, NL::B, A::Natural),
-                    (25, NL::C, A::Sharp),
-                    (27, NL::D, A::Sharp),
-                    (28, NL::E, A::Natural),
-                    (30, NL::F, A::Sharp),
-                    (32, NL::G, A::Sharp),
-                    (34, NL::A, A::Sharp),
-                    (35, NL::B, A::Natural),
+                    (11, NL::B, N),
+                    (13, NL::C, S),
+                    (15, NL::D, S),
+                    (16, NL::E, N),
+                    (18, NL::F, S),
+                    (20, NL::G, S),
+                    (22, NL::A, S),
+                    (23, NL::B, N),
+                    (25, NL::C, S),
+                    (27, NL::D, S),
+                    (28, NL::E, N),
+                    (30, NL::F, S),
+                    (32, NL::G, S),
+                    (34, NL::A, S),
+                    (35, NL::B, N),
                 ],
             ),
             (
                 SM::Minor,
                 58,
                 [
-                    (10, NL::B, A::Flat),
-                    (12, NL::C, A::Natural),
-                    (13, NL::D, A::Flat),
-                    (15, NL::E, A::Flat),
-                    (17, NL::F, A::Natural),
-                    (18, NL::G, A::Flat),
-                    (20, NL::A, A::Flat),
-                    (22, NL::B, A::Flat),
-                    (24, NL::C, A::Natural),
-                    (25, NL::D, A::Flat),
-                    (27, NL::E, A::Flat),
-                    (29, NL::F, A::Natural),
-                    (30, NL::G, A::Flat),
-                    (32, NL::A, A::Flat),
-                    (34, NL::B, A::Flat),
+                    (10, NL::B, F),
+                    (12, NL::C, N),
+                    (13, NL::D, F),
+                    (15, NL::E, F),
+                    (17, NL::F, N),
+                    (18, NL::G, F),
+                    (20, NL::A, F),
+                    (22, NL::B, F),
+                    (24, NL::C, N),
+                    (25, NL::D, F),
+                    (27, NL::E, F),
+                    (29, NL::F, N),
+                    (30, NL::G, F),
+                    (32, NL::A, F),
+                    (34, NL::B, F),
                 ],
             ),
             (
                 SM::Minor,
                 60,
                 [
-                    (0, NL::C, A::Natural),
-                    (2, NL::D, A::Natural),
-                    (3, NL::E, A::Flat),
-                    (5, NL::F, A::Natural),
-                    (7, NL::G, A::Natural),
-                    (8, NL::A, A::Flat),
-                    (10, NL::B, A::Flat),
-                    (12, NL::C, A::Natural),
-                    (14, NL::D, A::Natural),
-                    (15, NL::E, A::Flat),
-                    (17, NL::F, A::Natural),
-                    (19, NL::G, A::Natural),
-                    (20, NL::A, A::Flat),
-                    (22, NL::B, A::Flat),
-                    (24, NL::C, A::Natural),
+                    (0, NL::C, N),
+                    (2, NL::D, N),
+                    (3, NL::E, F),
+                    (5, NL::F, N),
+                    (7, NL::G, N),
+                    (8, NL::A, F),
+                    (10, NL::B, F),
+                    (12, NL::C, N),
+                    (14, NL::D, N),
+                    (15, NL::E, F),
+                    (17, NL::F, N),
+                    (19, NL::G, N),
+                    (20, NL::A, F),
+                    (22, NL::B, F),
+                    (24, NL::C, N),
                 ],
             ),
         ] {
@@ -1792,10 +1794,10 @@ B  Major ([59, 63, 66])";
             expected_pitch,
             expected_ascend,
         ) in [
-            (SM::Major, 60, 72, NL::C, A::Natural, 72, None),
-            (SM::Major, 60, 73, NL::C, A::Natural, 72, Some(A::Sharp)),
-            (SM::Major, 59, 65, NL::E, A::Natural, 64, Some(A::Sharp)),
-            (SM::Major, 59, 67, NL::G, A::Sharp, 68, Some(A::Natural)),
+            (SM::Major, 60, 72, NL::C, N, 72, None),
+            (SM::Major, 60, 73, NL::C, N, 72, Some(S)),
+            (SM::Major, 59, 65, NL::E, N, 64, Some(S)),
+            (SM::Major, 59, 67, NL::G, S, 68, Some(N)),
         ] {
             let rooted = scale.rooted(NoteName::name_of(root));
             let (name, diatonic_pitch, ascend) = rooted.ascending_match(pitch);
@@ -1817,10 +1819,10 @@ B  Major ([59, 63, 66])";
             expected_pitch,
             expected_descend,
         ) in [
-            (SM::Major, 60, 72, NL::C, A::Natural, 72, None),
-            (SM::Major, 60, 73, NL::D, A::Natural, 74, Some(A::Flat)),
-            (SM::Major, 61, 71, NL::C, A::Natural, 72, Some(A::Flat)),
-            (SM::Major, 61, 69, NL::A, A::Flat, 68, Some(A::Natural)),
+            (SM::Major, 60, 72, NL::C, N, 72, None),
+            (SM::Major, 60, 73, NL::D, N, 74, Some(F)),
+            (SM::Major, 61, 71, NL::C, N, 72, Some(F)),
+            (SM::Major, 61, 69, NL::A, F, 68, Some(N)),
         ] {
             let rooted = scale.rooted(NoteName::name_of(root));
             let (name, diatonic_pitch, descend) = rooted.descending_match(pitch);
@@ -1836,86 +1838,57 @@ B  Major ([59, 63, 66])";
         for (letter, modifier, mode, notes) in [
             (
                 NL::C,
-                A::Natural,
+                N,
                 CM::Major,
-                vec![
-                    (NL::C, A::Natural),
-                    (NL::E, A::Natural),
-                    (NL::G, A::Natural),
-                ],
+                vec![(NL::C, N), (NL::E, N), (NL::G, N)],
             ),
             (
                 NL::D,
-                A::Natural,
+                N,
                 CM::Major,
-                vec![(NL::D, A::Natural), (NL::F, A::Sharp), (NL::A, A::Natural)],
+                vec![(NL::D, N), (NL::F, S), (NL::A, N)],
             ),
             (
                 NL::E,
-                A::Flat,
+                F,
                 CM::Major,
-                vec![(NL::E, A::Flat), (NL::G, A::Natural), (NL::B, A::Flat)],
+                vec![(NL::E, F), (NL::G, N), (NL::B, F)],
             ),
             (
                 NL::G,
-                A::Natural,
+                N,
                 CM::Dominant7,
-                vec![
-                    (NL::G, A::Natural),
-                    (NL::B, A::Natural),
-                    (NL::D, A::Natural),
-                    (NL::F, A::Natural),
-                ],
+                vec![(NL::G, N), (NL::B, N), (NL::D, N), (NL::F, N)],
             ),
             (
                 NL::G,
-                A::Natural,
+                N,
                 CM::Minor,
-                vec![(NL::G, A::Natural), (NL::B, A::Flat), (NL::D, A::Natural)],
+                vec![(NL::G, N), (NL::B, F), (NL::D, N)],
             ),
             (
                 NL::G,
-                A::Natural,
+                N,
                 CM::Minor7,
-                vec![
-                    (NL::G, A::Natural),
-                    (NL::B, A::Flat),
-                    (NL::D, A::Natural),
-                    (NL::F, A::Natural),
-                ],
+                vec![(NL::G, N), (NL::B, F), (NL::D, N), (NL::F, N)],
             ),
             (
                 NL::G,
-                A::Natural,
+                N,
                 CM::HalfDiminished7,
-                vec![
-                    (NL::G, A::Natural),
-                    (NL::B, A::Flat),
-                    (NL::D, A::Flat),
-                    (NL::F, A::Natural),
-                ],
+                vec![(NL::G, N), (NL::B, F), (NL::D, F), (NL::F, N)],
             ),
             (
                 NL::G,
-                A::Sharp,
+                S,
                 CM::Diminished7,
-                vec![
-                    (NL::G, A::Sharp),
-                    (NL::B, A::Natural),
-                    (NL::D, A::Natural),
-                    (NL::F, A::Natural),
-                ],
+                vec![(NL::G, S), (NL::B, N), (NL::D, N), (NL::F, N)],
             ),
             (
                 NL::G,
-                A::Natural,
+                N,
                 CM::Diminished7,
-                vec![
-                    (NL::G, A::Natural),
-                    (NL::B, A::Flat),
-                    (NL::D, A::Flat),
-                    (NL::F, A::Flat),
-                ],
+                vec![(NL::G, N), (NL::B, F), (NL::D, F), (NL::F, F)],
             ),
         ] {
             let chord_name = ChordName {
@@ -1936,15 +1909,10 @@ B  Major ([59, 63, 66])";
     fn test_missing_chord_notes_from() {
         for (chord_root, chord_mode, scale_root, scale_mode, expected) in [
             (60, CM::Major, 60, SM::Major, vec![]),
-            (62, CM::Major, 60, SM::Major, vec![(NL::F, A::Sharp)]),
-            (60, CM::Dominant7, 60, SM::Major, vec![(NL::B, A::Flat)]),
-            (
-                57,
-                CM::Minor,
-                59,
-                SM::Major,
-                vec![(NL::A, A::Natural), (NL::C, A::Natural)],
-            ),
+            (60, CM::Major, 67, SM::Major, vec![]),
+            (62, CM::Major, 60, SM::Major, vec![(NL::F, S)]),
+            (60, CM::Dominant7, 60, SM::Major, vec![(NL::B, F)]),
+            (57, CM::Minor, 59, SM::Major, vec![(NL::A, N), (NL::C, N)]),
         ] {
             let chord_root = NoteName::name_of(chord_root);
             let scale_root = NoteName::name_of(scale_root);
