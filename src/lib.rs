@@ -1170,12 +1170,13 @@ mod tests {
     use rand::Rng;
 
     use crate::{
-        ActivePitches, ChordMode, ChordName, MAJOR_ROOT_IDS, MINOR_ROOT_IDS, NoteName,
-        PitchSequence, ScaleMode,
+        ActivePitches, ChordName, MAJOR_ROOT_IDS, MINOR_ROOT_IDS, NoteName, PitchSequence,
     };
 
     use crate::Accidental as A;
+    use crate::ChordMode as CM;
     use crate::NoteLetter as NL;
+    use crate::ScaleMode as SM;
 
     #[test]
     fn test_note_names() {
@@ -1200,7 +1201,7 @@ mod tests {
 
     #[test]
     fn test_ascending_scale() {
-        let scale = ScaleMode::Major.rooted(NoteName {
+        let scale = SM::Major.rooted(NoteName {
             letter: NL::C,
             modifier: A::Natural,
         });
@@ -1213,7 +1214,7 @@ mod tests {
 
     #[test]
     fn test_descending_scale() {
-        let c_notes = ScaleMode::Major
+        let c_notes = SM::Major
             .rooted(NoteName {
                 letter: NL::C,
                 modifier: A::Natural,
@@ -1243,12 +1244,12 @@ mod tests {
             modifier: A::Flat,
         };
         for (root, mode, current, interval, expected) in [
-            (root1, ScaleMode::Major, 60, 3, 64),
-            (root1, ScaleMode::Minor, 60, 3, 63),
-            (root1, ScaleMode::Phrygian, 60, 2, 61),
-            (root2, ScaleMode::MelodicMinor, 66, 1, 66),
-            (root2, ScaleMode::MelodicMinor, 66, 6, 75),
-            (root3, ScaleMode::MelodicMinor, 58, 7, 69),
+            (root1, SM::Major, 60, 3, 64),
+            (root1, SM::Minor, 60, 3, 63),
+            (root1, SM::Phrygian, 60, 2, 61),
+            (root2, SM::MelodicMinor, 66, 1, 66),
+            (root2, SM::MelodicMinor, 66, 6, 75),
+            (root3, SM::MelodicMinor, 58, 7, 69),
         ] {
             let scale = mode.rooted(root);
             assert_eq!(scale.note_up(current, interval).unwrap(), expected);
@@ -1270,12 +1271,12 @@ mod tests {
             modifier: A::Flat,
         };
         for (root, mode, current, interval, expected) in [
-            (root1, ScaleMode::Major, 60, 3, 57),
-            (root1, ScaleMode::Minor, 60, 3, 56),
-            (root1, ScaleMode::Phrygian, 60, 2, 58),
-            (root2, ScaleMode::MelodicMinor, 66, 2, 64),
-            (root2, ScaleMode::MelodicMinor, 66, 3, 62),
-            (root3, ScaleMode::MelodicMinor, 58, 7, 48),
+            (root1, SM::Major, 60, 3, 57),
+            (root1, SM::Minor, 60, 3, 56),
+            (root1, SM::Phrygian, 60, 2, 58),
+            (root2, SM::MelodicMinor, 66, 2, 64),
+            (root2, SM::MelodicMinor, 66, 3, 62),
+            (root3, SM::MelodicMinor, 58, 7, 48),
         ] {
             let scale = mode.rooted(root);
             assert_eq!(scale.note_down(current, interval).unwrap(), expected);
@@ -1382,18 +1383,18 @@ B  Major ([59, 63, 66])";
                 letter: MAJOR_ROOT_IDS[i].0,
                 modifier: MAJOR_ROOT_IDS[i].1,
             };
-            assert_eq!(expected[i], ScaleMode::Major.rooted(note).middle_c());
+            assert_eq!(expected[i], SM::Major.rooted(note).middle_c());
         }
     }
 
     #[test]
     fn test_diatonic_intervals() {
         for (root, mode, p1, p2, expected) in [
-            (71, ScaleMode::Major, 70, 75, Some(3)),
-            (71, ScaleMode::Major, 75, 70, Some(3)),
-            (71, ScaleMode::Major, 70, 74, None),
-            (67, ScaleMode::Major, 71, 71, Some(0)),
-            (62, ScaleMode::Dorian, 65, 74, Some(5)),
+            (71, SM::Major, 70, 75, Some(3)),
+            (71, SM::Major, 75, 70, Some(3)),
+            (71, SM::Major, 70, 74, None),
+            (67, SM::Major, 71, 71, Some(0)),
+            (62, SM::Dorian, 65, 74, Some(5)),
         ] {
             let root = NoteName::name_of(root);
             let scale = mode.rooted(root);
@@ -1403,10 +1404,7 @@ B  Major ([59, 63, 66])";
 
     #[test]
     fn test_round_up() {
-        for (root, mode, pitch, expected) in [
-            (65, ScaleMode::Major, 71, 72),
-            (65, ScaleMode::Major, 72, 72),
-        ] {
+        for (root, mode, pitch, expected) in [(65, SM::Major, 71, 72), (65, SM::Major, 72, 72)] {
             let root = NoteName::name_of(root);
             let scale = mode.rooted(root);
             assert_eq!(scale.round_up(pitch), expected);
@@ -1415,10 +1413,7 @@ B  Major ([59, 63, 66])";
 
     #[test]
     fn test_round_down() {
-        for (root, mode, pitch, expected) in [
-            (65, ScaleMode::Major, 71, 70),
-            (65, ScaleMode::Major, 72, 72),
-        ] {
+        for (root, mode, pitch, expected) in [(65, SM::Major, 71, 70), (65, SM::Major, 72, 72)] {
             let root = NoteName::name_of(root);
             let scale = mode.rooted(root);
             assert_eq!(scale.round_down(pitch), expected);
@@ -1429,7 +1424,7 @@ B  Major ([59, 63, 66])";
     fn test_note_letters() {
         for (scale, root, letters) in [
             (
-                ScaleMode::Major,
+                SM::Major,
                 60,
                 [
                     (0, NL::C),
@@ -1450,7 +1445,7 @@ B  Major ([59, 63, 66])";
                 ],
             ),
             (
-                ScaleMode::Major,
+                SM::Major,
                 59,
                 [
                     (11, NL::B),
@@ -1471,7 +1466,7 @@ B  Major ([59, 63, 66])";
                 ],
             ),
             (
-                ScaleMode::Minor,
+                SM::Minor,
                 58,
                 [
                     (10, NL::B),
@@ -1492,7 +1487,7 @@ B  Major ([59, 63, 66])";
                 ],
             ),
             (
-                ScaleMode::Minor,
+                SM::Minor,
                 60,
                 [
                     (0, NL::C),
@@ -1528,7 +1523,7 @@ B  Major ([59, 63, 66])";
     fn test_note_name_letters() {
         for (scale, root, letters) in [
             (
-                ScaleMode::Major,
+                SM::Major,
                 60,
                 [
                     (0, NL::C, A::Natural),
@@ -1549,7 +1544,7 @@ B  Major ([59, 63, 66])";
                 ],
             ),
             (
-                ScaleMode::Major,
+                SM::Major,
                 59,
                 [
                     (11, NL::B, A::Natural),
@@ -1570,7 +1565,7 @@ B  Major ([59, 63, 66])";
                 ],
             ),
             (
-                ScaleMode::Minor,
+                SM::Minor,
                 58,
                 [
                     (10, NL::B, A::Flat),
@@ -1591,7 +1586,7 @@ B  Major ([59, 63, 66])";
                 ],
             ),
             (
-                ScaleMode::Minor,
+                SM::Minor,
                 60,
                 [
                     (0, NL::C, A::Natural),
@@ -1628,16 +1623,12 @@ B  Major ([59, 63, 66])";
     #[test]
     fn test_all_flats() {
         for (scale, root, target) in [
-            (ScaleMode::Major, 60, vec![]),
-            (ScaleMode::Minor, 60, vec![NL::B, NL::A, NL::E]),
-            (ScaleMode::Major, 62, vec![]),
-            (ScaleMode::Major, 17, vec![NL::B]),
-            (ScaleMode::Minor, 17, vec![NL::E, NL::D, NL::B, NL::A]),
-            (
-                ScaleMode::Major,
-                61,
-                vec![NL::D, NL::B, NL::A, NL::G, NL::E],
-            ),
+            (SM::Major, 60, vec![]),
+            (SM::Minor, 60, vec![NL::B, NL::A, NL::E]),
+            (SM::Major, 62, vec![]),
+            (SM::Major, 17, vec![NL::B]),
+            (SM::Minor, 17, vec![NL::E, NL::D, NL::B, NL::A]),
+            (SM::Major, 61, vec![NL::D, NL::B, NL::A, NL::G, NL::E]),
         ] {
             let rooted = scale.rooted(NoteName::name_of(root));
             assert_eq!(target, rooted.all_flats().collect::<Vec<_>>());
@@ -1647,16 +1638,12 @@ B  Major ([59, 63, 66])";
     #[test]
     fn test_all_sharps() {
         for (scale, root, target) in [
-            (ScaleMode::Major, 60, vec![]),
-            (ScaleMode::Minor, 60, vec![]),
-            (ScaleMode::Major, 62, vec![NL::C, NL::F]),
+            (SM::Major, 60, vec![]),
+            (SM::Minor, 60, vec![]),
+            (SM::Major, 62, vec![NL::C, NL::F]),
+            (SM::Major, 59, vec![NL::A, NL::G, NL::F, NL::D, NL::C]),
             (
-                ScaleMode::Major,
-                59,
-                vec![NL::A, NL::G, NL::F, NL::D, NL::C],
-            ),
-            (
-                ScaleMode::Major,
+                SM::Major,
                 18,
                 vec![NL::F, NL::E, NL::D, NL::C, NL::A, NL::G],
             ),
@@ -1669,13 +1656,13 @@ B  Major ([59, 63, 66])";
     #[test]
     fn test_diatonic_bracket() {
         for (scale, root, note, expected) in [
-            (ScaleMode::Major, 60, 61, Some((60, 62))),
-            (ScaleMode::Minor, 69, 61, Some((60, 62))),
-            (ScaleMode::Major, 67, 73, Some((72, 74))),
-            (ScaleMode::Major, 67, 72, None),
-            (ScaleMode::Major, 59, 67, Some((66, 68))),
-            (ScaleMode::Augmented, 60, 65, Some((64, 67))),
-            (ScaleMode::Augmented, 60, 66, Some((64, 67))),
+            (SM::Major, 60, 61, Some((60, 62))),
+            (SM::Minor, 69, 61, Some((60, 62))),
+            (SM::Major, 67, 73, Some((72, 74))),
+            (SM::Major, 67, 72, None),
+            (SM::Major, 59, 67, Some((66, 68))),
+            (SM::Augmented, 60, 65, Some((64, 67))),
+            (SM::Augmented, 60, 66, Some((64, 67))),
         ] {
             let rooted = scale.rooted(NoteName::name_of(root));
             assert_eq!(expected, rooted.diatonic_bracket_for(note));
@@ -1686,7 +1673,7 @@ B  Major ([59, 63, 66])";
     fn test_mode_iterator() {
         for (scale, letter, expected) in [
             (
-                ScaleMode::Major,
+                SM::Major,
                 NL::D,
                 vec![
                     NL::D,
@@ -1701,7 +1688,7 @@ B  Major ([59, 63, 66])";
                 ],
             ),
             (
-                ScaleMode::Minor,
+                SM::Minor,
                 NL::A,
                 vec![
                     NL::A,
@@ -1716,7 +1703,7 @@ B  Major ([59, 63, 66])";
                 ],
             ),
             (
-                ScaleMode::Dorian,
+                SM::Dorian,
                 NL::F,
                 vec![
                     NL::F,
@@ -1731,7 +1718,7 @@ B  Major ([59, 63, 66])";
                 ],
             ),
             (
-                ScaleMode::Augmented,
+                SM::Augmented,
                 NL::C,
                 vec![
                     NL::C,
@@ -1756,7 +1743,7 @@ B  Major ([59, 63, 66])";
         for (letter, modifier) in MINOR_ROOT_IDS.iter().copied() {
             println!("New loop: {letter:?} {modifier:?}");
             let root = NoteName { letter, modifier };
-            let scale = ScaleMode::MelodicMinor.rooted(root);
+            let scale = SM::MelodicMinor.rooted(root);
             let mut ups = scale.all_diatonic_notes_up().collect::<VecDeque<_>>();
             let mut dns = scale.all_diatonic_notes_down().collect::<VecDeque<_>>();
             while ups[ups.len() - 1] != dns[0] {
@@ -1805,34 +1792,10 @@ B  Major ([59, 63, 66])";
             expected_pitch,
             expected_ascend,
         ) in [
-            (ScaleMode::Major, 60, 72, NL::C, A::Natural, 72, None),
-            (
-                ScaleMode::Major,
-                60,
-                73,
-                NL::C,
-                A::Natural,
-                72,
-                Some(A::Sharp),
-            ),
-            (
-                ScaleMode::Major,
-                59,
-                65,
-                NL::E,
-                A::Natural,
-                64,
-                Some(A::Sharp),
-            ),
-            (
-                ScaleMode::Major,
-                59,
-                67,
-                NL::G,
-                A::Sharp,
-                68,
-                Some(A::Natural),
-            ),
+            (SM::Major, 60, 72, NL::C, A::Natural, 72, None),
+            (SM::Major, 60, 73, NL::C, A::Natural, 72, Some(A::Sharp)),
+            (SM::Major, 59, 65, NL::E, A::Natural, 64, Some(A::Sharp)),
+            (SM::Major, 59, 67, NL::G, A::Sharp, 68, Some(A::Natural)),
         ] {
             let rooted = scale.rooted(NoteName::name_of(root));
             let (name, diatonic_pitch, ascend) = rooted.ascending_match(pitch);
@@ -1854,34 +1817,10 @@ B  Major ([59, 63, 66])";
             expected_pitch,
             expected_descend,
         ) in [
-            (ScaleMode::Major, 60, 72, NL::C, A::Natural, 72, None),
-            (
-                ScaleMode::Major,
-                60,
-                73,
-                NL::D,
-                A::Natural,
-                74,
-                Some(A::Flat),
-            ),
-            (
-                ScaleMode::Major,
-                61,
-                71,
-                NL::C,
-                A::Natural,
-                72,
-                Some(A::Flat),
-            ),
-            (
-                ScaleMode::Major,
-                61,
-                69,
-                NL::A,
-                A::Flat,
-                68,
-                Some(A::Natural),
-            ),
+            (SM::Major, 60, 72, NL::C, A::Natural, 72, None),
+            (SM::Major, 60, 73, NL::D, A::Natural, 74, Some(A::Flat)),
+            (SM::Major, 61, 71, NL::C, A::Natural, 72, Some(A::Flat)),
+            (SM::Major, 61, 69, NL::A, A::Flat, 68, Some(A::Natural)),
         ] {
             let rooted = scale.rooted(NoteName::name_of(root));
             let (name, diatonic_pitch, descend) = rooted.descending_match(pitch);
@@ -1898,7 +1837,7 @@ B  Major ([59, 63, 66])";
             (
                 NL::C,
                 A::Natural,
-                ChordMode::Major,
+                CM::Major,
                 vec![
                     (NL::C, A::Natural),
                     (NL::E, A::Natural),
@@ -1908,19 +1847,19 @@ B  Major ([59, 63, 66])";
             (
                 NL::D,
                 A::Natural,
-                ChordMode::Major,
+                CM::Major,
                 vec![(NL::D, A::Natural), (NL::F, A::Sharp), (NL::A, A::Natural)],
             ),
             (
                 NL::E,
                 A::Flat,
-                ChordMode::Major,
+                CM::Major,
                 vec![(NL::E, A::Flat), (NL::G, A::Natural), (NL::B, A::Flat)],
             ),
             (
                 NL::G,
                 A::Natural,
-                ChordMode::Dominant7,
+                CM::Dominant7,
                 vec![
                     (NL::G, A::Natural),
                     (NL::B, A::Natural),
@@ -1931,13 +1870,13 @@ B  Major ([59, 63, 66])";
             (
                 NL::G,
                 A::Natural,
-                ChordMode::Minor,
+                CM::Minor,
                 vec![(NL::G, A::Natural), (NL::B, A::Flat), (NL::D, A::Natural)],
             ),
             (
                 NL::G,
                 A::Natural,
-                ChordMode::Minor7,
+                CM::Minor7,
                 vec![
                     (NL::G, A::Natural),
                     (NL::B, A::Flat),
@@ -1948,7 +1887,7 @@ B  Major ([59, 63, 66])";
             (
                 NL::G,
                 A::Natural,
-                ChordMode::HalfDiminished7,
+                CM::HalfDiminished7,
                 vec![
                     (NL::G, A::Natural),
                     (NL::B, A::Flat),
@@ -1959,7 +1898,7 @@ B  Major ([59, 63, 66])";
             (
                 NL::G,
                 A::Sharp,
-                ChordMode::Diminished7,
+                CM::Diminished7,
                 vec![
                     (NL::G, A::Sharp),
                     (NL::B, A::Natural),
@@ -1970,7 +1909,7 @@ B  Major ([59, 63, 66])";
             (
                 NL::G,
                 A::Natural,
-                ChordMode::Diminished7,
+                CM::Diminished7,
                 vec![
                     (NL::G, A::Natural),
                     (NL::B, A::Flat),
@@ -1996,13 +1935,15 @@ B  Major ([59, 63, 66])";
     #[test]
     fn test_missing_chord_notes_from() {
         for (chord_root, chord_mode, scale_root, scale_mode, expected) in [
-            (60, ChordMode::Major, 60, ScaleMode::Major, vec![]),
+            (60, CM::Major, 60, SM::Major, vec![]),
+            (62, CM::Major, 60, SM::Major, vec![(NL::F, A::Sharp)]),
+            (60, CM::Dominant7, 60, SM::Major, vec![(NL::B, A::Flat)]),
             (
-                62,
-                ChordMode::Major,
-                60,
-                ScaleMode::Major,
-                vec![(NL::F, A::Sharp)],
+                57,
+                CM::Minor,
+                59,
+                SM::Major,
+                vec![(NL::A, A::Natural), (NL::C, A::Natural)],
             ),
         ] {
             let chord_root = NoteName::name_of(chord_root);
