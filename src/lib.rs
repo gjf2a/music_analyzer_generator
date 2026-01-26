@@ -1198,7 +1198,7 @@ mod tests {
             (70, NL::B, F),
             (71, NL::B, N),
         ];
-        for (pitch, letter, modifier) in note_name {
+        for (pitch, ltr, acc) in note_name {
             assert_eq!(NoteName::name_of(pitch), NoteName { ltr, acc });
         }
     }

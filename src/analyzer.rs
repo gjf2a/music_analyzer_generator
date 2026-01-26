@@ -67,6 +67,7 @@ impl From<&Recording> for ChordProgression {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use midi_note_recorder::Recording;
 
@@ -76,7 +77,6 @@ mod tests {
     use crate::Accidental::Flat as F;
     use crate::Accidental::Natural as N;
     use crate::Accidental::Sharp as S;
-    use crate::ChordMode as CM;
     use crate::NoteLetter as NL;
     use crate::ScaleMode as SM;
 
