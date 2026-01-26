@@ -1,7 +1,7 @@
 pub mod analyzer;
 
 use std::{
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, HashSet, VecDeque},
     fmt::Display,
 };
 
@@ -11,7 +11,7 @@ use midi_fundsp::note_velocity_from;
 use midi_msg::MidiMsg;
 use midi_note_recorder::Recording;
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Sequence)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Sequence, Hash)]
 pub enum NoteLetter {
     C,
     D,
@@ -88,7 +88,7 @@ const MINOR_ROOT_IDS: [(NoteLetter, Accidental); 12] = [
     (NoteLetter::B, Accidental::Natural),
 ];
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub enum Accidental {
     DoubleFlat,
     Flat,
@@ -174,7 +174,7 @@ impl Accidental {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct NoteName {
     letter: NoteLetter,
     modifier: Accidental,
@@ -184,6 +184,18 @@ impl NoteName {
     pub fn name_of(pitch: u8) -> Self {
         let (letter, modifier) = MAJOR_ROOT_IDS[(pitch % 12) as usize];
         Self { letter, modifier }
+    }
+
+    pub fn reference_pitch(&self) -> Option<u8> {
+        self.modifier.pitch_shift(self.letter.natural_pitch())
+    }
+
+    pub fn synonym_of(&self, other: &NoteName) -> bool {
+        if let (Some(p1), Some(p2)) = (self.reference_pitch(), other.reference_pitch()) {
+            p1 == p2
+        } else {
+            false
+        }
     }
 
     pub fn full_name_for(letter: NoteLetter, pitch: u8) -> Self {
@@ -259,6 +271,18 @@ impl Display for ChordName {
 impl ChordName {
     pub fn from_active_pitches(active: ActivePitches) -> Option<Self> {
         SimpleChordInfo::new(active).map(|info| info.mode())
+    }
+
+    pub fn missing_chord_tones_from(&self, scale: &RootedScale) -> Vec<NoteName> {
+        self.note_names()
+            .iter()
+            .filter(|chord_note| {
+                scale
+                    .all_diatonic_note_names_unordered()
+                    .all(|scale_note| !chord_note.synonym_of(&scale_note))
+            })
+            .copied()
+            .collect()
     }
 
     pub fn root_name(&self) -> NoteName {
@@ -429,6 +453,7 @@ pub struct RootedScale {
     notes2names_up: BTreeMap<u8, NoteName>,
     notes2letters_down: BTreeMap<u8, NoteLetter>,
     notes2names_down: BTreeMap<u8, NoteName>,
+    all_note_names: HashSet<NoteName>,
 }
 
 impl RootedScale {
@@ -440,6 +465,7 @@ impl RootedScale {
             notes2names_up: BTreeMap::default(),
             notes2letters_down: BTreeMap::default(),
             notes2names_down: BTreeMap::default(),
+            all_note_names: HashSet::default(),
         };
         let notes2letters_up = result.all_diatonic_note_letters_up().collect();
         result.notes2letters_up = notes2letters_up;
@@ -449,6 +475,12 @@ impl RootedScale {
         result.notes2letters_down = notes2letters_down;
         let notes2names_down = result.all_diatonic_notes_down().collect();
         result.notes2names_down = notes2names_down;
+        for note_name in result.notes2names_up.values() {
+            result.all_note_names.insert(*note_name);
+        }
+        for note_name in result.notes2names_down.values() {
+            result.all_note_names.insert(*note_name);
+        }
         result
     }
 
@@ -470,6 +502,10 @@ impl RootedScale {
     pub fn all_diatonic_notes_down(&self) -> impl Iterator<Item = (u8, NoteName)> {
         self.all_diatonic_note_letters_down()
             .map(|(pitch, letter)| (pitch, NoteName::full_name_for(letter, pitch)))
+    }
+
+    pub fn all_diatonic_note_names_unordered(&self) -> impl Iterator<Item = NoteName> {
+        self.all_note_names.iter().copied()
     }
 
     pub fn contains(&self, note: u8) -> bool {
@@ -1134,25 +1170,28 @@ mod tests {
     use rand::Rng;
 
     use crate::{
-        Accidental, ActivePitches, ChordMode, ChordName, MAJOR_ROOT_IDS, MINOR_ROOT_IDS,
-        NoteLetter, NoteName, PitchSequence, ScaleMode,
+        ActivePitches, ChordMode, ChordName, MAJOR_ROOT_IDS, MINOR_ROOT_IDS, NoteName,
+        PitchSequence, ScaleMode,
     };
+
+    use crate::Accidental as A;
+    use crate::NoteLetter as NL;
 
     #[test]
     fn test_note_names() {
         let note_name = [
-            (60, NoteLetter::C, Accidental::Natural),
-            (61, NoteLetter::D, Accidental::Flat),
-            (62, NoteLetter::D, Accidental::Natural),
-            (63, NoteLetter::E, Accidental::Flat),
-            (64, NoteLetter::E, Accidental::Natural),
-            (65, NoteLetter::F, Accidental::Natural),
-            (66, NoteLetter::F, Accidental::Sharp),
-            (67, NoteLetter::G, Accidental::Natural),
-            (68, NoteLetter::A, Accidental::Flat),
-            (69, NoteLetter::A, Accidental::Natural),
-            (70, NoteLetter::B, Accidental::Flat),
-            (71, NoteLetter::B, Accidental::Natural),
+            (60, NL::C, A::Natural),
+            (61, NL::D, A::Flat),
+            (62, NL::D, A::Natural),
+            (63, NL::E, A::Flat),
+            (64, NL::E, A::Natural),
+            (65, NL::F, A::Natural),
+            (66, NL::F, A::Sharp),
+            (67, NL::G, A::Natural),
+            (68, NL::A, A::Flat),
+            (69, NL::A, A::Natural),
+            (70, NL::B, A::Flat),
+            (71, NL::B, A::Natural),
         ];
         for (pitch, letter, modifier) in note_name {
             assert_eq!(NoteName::name_of(pitch), NoteName { letter, modifier });
@@ -1162,8 +1201,8 @@ mod tests {
     #[test]
     fn test_ascending_scale() {
         let scale = ScaleMode::Major.rooted(NoteName {
-            letter: NoteLetter::C,
-            modifier: Accidental::Natural,
+            letter: NL::C,
+            modifier: A::Natural,
         });
         let c_notes = scale.notes_going_up().collect::<Vec<_>>();
         assert_eq!(
@@ -1176,8 +1215,8 @@ mod tests {
     fn test_descending_scale() {
         let c_notes = ScaleMode::Major
             .rooted(NoteName {
-                letter: NoteLetter::C,
-                modifier: Accidental::Natural,
+                letter: NL::C,
+                modifier: A::Natural,
             })
             .notes_going_down()
             .collect::<Vec<_>>();
@@ -1192,16 +1231,16 @@ mod tests {
     #[test]
     fn test_note_up() {
         let root1 = NoteName {
-            letter: NoteLetter::C,
-            modifier: Accidental::Natural,
+            letter: NL::C,
+            modifier: A::Natural,
         };
         let root2 = NoteName {
-            letter: NoteLetter::F,
-            modifier: Accidental::Sharp,
+            letter: NL::F,
+            modifier: A::Sharp,
         };
         let root3 = NoteName {
-            letter: NoteLetter::B,
-            modifier: Accidental::Flat,
+            letter: NL::B,
+            modifier: A::Flat,
         };
         for (root, mode, current, interval, expected) in [
             (root1, ScaleMode::Major, 60, 3, 64),
@@ -1219,16 +1258,16 @@ mod tests {
     #[test]
     fn test_note_down() {
         let root1 = NoteName {
-            letter: NoteLetter::C,
-            modifier: Accidental::Natural,
+            letter: NL::C,
+            modifier: A::Natural,
         };
         let root2 = NoteName {
-            letter: NoteLetter::F,
-            modifier: Accidental::Sharp,
+            letter: NL::F,
+            modifier: A::Sharp,
         };
         let root3 = NoteName {
-            letter: NoteLetter::B,
-            modifier: Accidental::Flat,
+            letter: NL::B,
+            modifier: A::Flat,
         };
         for (root, mode, current, interval, expected) in [
             (root1, ScaleMode::Major, 60, 3, 57),
@@ -1393,84 +1432,84 @@ B  Major ([59, 63, 66])";
                 ScaleMode::Major,
                 60,
                 [
-                    (0, NoteLetter::C),
-                    (2, NoteLetter::D),
-                    (4, NoteLetter::E),
-                    (5, NoteLetter::F),
-                    (7, NoteLetter::G),
-                    (9, NoteLetter::A),
-                    (11, NoteLetter::B),
-                    (12, NoteLetter::C),
-                    (14, NoteLetter::D),
-                    (16, NoteLetter::E),
-                    (17, NoteLetter::F),
-                    (19, NoteLetter::G),
-                    (21, NoteLetter::A),
-                    (23, NoteLetter::B),
-                    (24, NoteLetter::C),
+                    (0, NL::C),
+                    (2, NL::D),
+                    (4, NL::E),
+                    (5, NL::F),
+                    (7, NL::G),
+                    (9, NL::A),
+                    (11, NL::B),
+                    (12, NL::C),
+                    (14, NL::D),
+                    (16, NL::E),
+                    (17, NL::F),
+                    (19, NL::G),
+                    (21, NL::A),
+                    (23, NL::B),
+                    (24, NL::C),
                 ],
             ),
             (
                 ScaleMode::Major,
                 59,
                 [
-                    (11, NoteLetter::B),
-                    (13, NoteLetter::C),
-                    (15, NoteLetter::D),
-                    (16, NoteLetter::E),
-                    (18, NoteLetter::F),
-                    (20, NoteLetter::G),
-                    (22, NoteLetter::A),
-                    (23, NoteLetter::B),
-                    (25, NoteLetter::C),
-                    (27, NoteLetter::D),
-                    (28, NoteLetter::E),
-                    (30, NoteLetter::F),
-                    (32, NoteLetter::G),
-                    (34, NoteLetter::A),
-                    (35, NoteLetter::B),
+                    (11, NL::B),
+                    (13, NL::C),
+                    (15, NL::D),
+                    (16, NL::E),
+                    (18, NL::F),
+                    (20, NL::G),
+                    (22, NL::A),
+                    (23, NL::B),
+                    (25, NL::C),
+                    (27, NL::D),
+                    (28, NL::E),
+                    (30, NL::F),
+                    (32, NL::G),
+                    (34, NL::A),
+                    (35, NL::B),
                 ],
             ),
             (
                 ScaleMode::Minor,
                 58,
                 [
-                    (10, NoteLetter::B),
-                    (12, NoteLetter::C),
-                    (13, NoteLetter::D),
-                    (15, NoteLetter::E),
-                    (17, NoteLetter::F),
-                    (18, NoteLetter::G),
-                    (20, NoteLetter::A),
-                    (22, NoteLetter::B),
-                    (24, NoteLetter::C),
-                    (25, NoteLetter::D),
-                    (27, NoteLetter::E),
-                    (29, NoteLetter::F),
-                    (30, NoteLetter::G),
-                    (32, NoteLetter::A),
-                    (34, NoteLetter::B),
+                    (10, NL::B),
+                    (12, NL::C),
+                    (13, NL::D),
+                    (15, NL::E),
+                    (17, NL::F),
+                    (18, NL::G),
+                    (20, NL::A),
+                    (22, NL::B),
+                    (24, NL::C),
+                    (25, NL::D),
+                    (27, NL::E),
+                    (29, NL::F),
+                    (30, NL::G),
+                    (32, NL::A),
+                    (34, NL::B),
                 ],
             ),
             (
                 ScaleMode::Minor,
                 60,
                 [
-                    (0, NoteLetter::C),
-                    (2, NoteLetter::D),
-                    (3, NoteLetter::E),
-                    (5, NoteLetter::F),
-                    (7, NoteLetter::G),
-                    (8, NoteLetter::A),
-                    (10, NoteLetter::B),
-                    (12, NoteLetter::C),
-                    (14, NoteLetter::D),
-                    (15, NoteLetter::E),
-                    (17, NoteLetter::F),
-                    (19, NoteLetter::G),
-                    (20, NoteLetter::A),
-                    (22, NoteLetter::B),
-                    (24, NoteLetter::C),
+                    (0, NL::C),
+                    (2, NL::D),
+                    (3, NL::E),
+                    (5, NL::F),
+                    (7, NL::G),
+                    (8, NL::A),
+                    (10, NL::B),
+                    (12, NL::C),
+                    (14, NL::D),
+                    (15, NL::E),
+                    (17, NL::F),
+                    (19, NL::G),
+                    (20, NL::A),
+                    (22, NL::B),
+                    (24, NL::C),
                 ],
             ),
         ] {
@@ -1492,84 +1531,84 @@ B  Major ([59, 63, 66])";
                 ScaleMode::Major,
                 60,
                 [
-                    (0, NoteLetter::C, Accidental::Natural),
-                    (2, NoteLetter::D, Accidental::Natural),
-                    (4, NoteLetter::E, Accidental::Natural),
-                    (5, NoteLetter::F, Accidental::Natural),
-                    (7, NoteLetter::G, Accidental::Natural),
-                    (9, NoteLetter::A, Accidental::Natural),
-                    (11, NoteLetter::B, Accidental::Natural),
-                    (12, NoteLetter::C, Accidental::Natural),
-                    (14, NoteLetter::D, Accidental::Natural),
-                    (16, NoteLetter::E, Accidental::Natural),
-                    (17, NoteLetter::F, Accidental::Natural),
-                    (19, NoteLetter::G, Accidental::Natural),
-                    (21, NoteLetter::A, Accidental::Natural),
-                    (23, NoteLetter::B, Accidental::Natural),
-                    (24, NoteLetter::C, Accidental::Natural),
+                    (0, NL::C, A::Natural),
+                    (2, NL::D, A::Natural),
+                    (4, NL::E, A::Natural),
+                    (5, NL::F, A::Natural),
+                    (7, NL::G, A::Natural),
+                    (9, NL::A, A::Natural),
+                    (11, NL::B, A::Natural),
+                    (12, NL::C, A::Natural),
+                    (14, NL::D, A::Natural),
+                    (16, NL::E, A::Natural),
+                    (17, NL::F, A::Natural),
+                    (19, NL::G, A::Natural),
+                    (21, NL::A, A::Natural),
+                    (23, NL::B, A::Natural),
+                    (24, NL::C, A::Natural),
                 ],
             ),
             (
                 ScaleMode::Major,
                 59,
                 [
-                    (11, NoteLetter::B, Accidental::Natural),
-                    (13, NoteLetter::C, Accidental::Sharp),
-                    (15, NoteLetter::D, Accidental::Sharp),
-                    (16, NoteLetter::E, Accidental::Natural),
-                    (18, NoteLetter::F, Accidental::Sharp),
-                    (20, NoteLetter::G, Accidental::Sharp),
-                    (22, NoteLetter::A, Accidental::Sharp),
-                    (23, NoteLetter::B, Accidental::Natural),
-                    (25, NoteLetter::C, Accidental::Sharp),
-                    (27, NoteLetter::D, Accidental::Sharp),
-                    (28, NoteLetter::E, Accidental::Natural),
-                    (30, NoteLetter::F, Accidental::Sharp),
-                    (32, NoteLetter::G, Accidental::Sharp),
-                    (34, NoteLetter::A, Accidental::Sharp),
-                    (35, NoteLetter::B, Accidental::Natural),
+                    (11, NL::B, A::Natural),
+                    (13, NL::C, A::Sharp),
+                    (15, NL::D, A::Sharp),
+                    (16, NL::E, A::Natural),
+                    (18, NL::F, A::Sharp),
+                    (20, NL::G, A::Sharp),
+                    (22, NL::A, A::Sharp),
+                    (23, NL::B, A::Natural),
+                    (25, NL::C, A::Sharp),
+                    (27, NL::D, A::Sharp),
+                    (28, NL::E, A::Natural),
+                    (30, NL::F, A::Sharp),
+                    (32, NL::G, A::Sharp),
+                    (34, NL::A, A::Sharp),
+                    (35, NL::B, A::Natural),
                 ],
             ),
             (
                 ScaleMode::Minor,
                 58,
                 [
-                    (10, NoteLetter::B, Accidental::Flat),
-                    (12, NoteLetter::C, Accidental::Natural),
-                    (13, NoteLetter::D, Accidental::Flat),
-                    (15, NoteLetter::E, Accidental::Flat),
-                    (17, NoteLetter::F, Accidental::Natural),
-                    (18, NoteLetter::G, Accidental::Flat),
-                    (20, NoteLetter::A, Accidental::Flat),
-                    (22, NoteLetter::B, Accidental::Flat),
-                    (24, NoteLetter::C, Accidental::Natural),
-                    (25, NoteLetter::D, Accidental::Flat),
-                    (27, NoteLetter::E, Accidental::Flat),
-                    (29, NoteLetter::F, Accidental::Natural),
-                    (30, NoteLetter::G, Accidental::Flat),
-                    (32, NoteLetter::A, Accidental::Flat),
-                    (34, NoteLetter::B, Accidental::Flat),
+                    (10, NL::B, A::Flat),
+                    (12, NL::C, A::Natural),
+                    (13, NL::D, A::Flat),
+                    (15, NL::E, A::Flat),
+                    (17, NL::F, A::Natural),
+                    (18, NL::G, A::Flat),
+                    (20, NL::A, A::Flat),
+                    (22, NL::B, A::Flat),
+                    (24, NL::C, A::Natural),
+                    (25, NL::D, A::Flat),
+                    (27, NL::E, A::Flat),
+                    (29, NL::F, A::Natural),
+                    (30, NL::G, A::Flat),
+                    (32, NL::A, A::Flat),
+                    (34, NL::B, A::Flat),
                 ],
             ),
             (
                 ScaleMode::Minor,
                 60,
                 [
-                    (0, NoteLetter::C, Accidental::Natural),
-                    (2, NoteLetter::D, Accidental::Natural),
-                    (3, NoteLetter::E, Accidental::Flat),
-                    (5, NoteLetter::F, Accidental::Natural),
-                    (7, NoteLetter::G, Accidental::Natural),
-                    (8, NoteLetter::A, Accidental::Flat),
-                    (10, NoteLetter::B, Accidental::Flat),
-                    (12, NoteLetter::C, Accidental::Natural),
-                    (14, NoteLetter::D, Accidental::Natural),
-                    (15, NoteLetter::E, Accidental::Flat),
-                    (17, NoteLetter::F, Accidental::Natural),
-                    (19, NoteLetter::G, Accidental::Natural),
-                    (20, NoteLetter::A, Accidental::Flat),
-                    (22, NoteLetter::B, Accidental::Flat),
-                    (24, NoteLetter::C, Accidental::Natural),
+                    (0, NL::C, A::Natural),
+                    (2, NL::D, A::Natural),
+                    (3, NL::E, A::Flat),
+                    (5, NL::F, A::Natural),
+                    (7, NL::G, A::Natural),
+                    (8, NL::A, A::Flat),
+                    (10, NL::B, A::Flat),
+                    (12, NL::C, A::Natural),
+                    (14, NL::D, A::Natural),
+                    (15, NL::E, A::Flat),
+                    (17, NL::F, A::Natural),
+                    (19, NL::G, A::Natural),
+                    (20, NL::A, A::Flat),
+                    (22, NL::B, A::Flat),
+                    (24, NL::C, A::Natural),
                 ],
             ),
         ] {
@@ -1590,28 +1629,14 @@ B  Major ([59, 63, 66])";
     fn test_all_flats() {
         for (scale, root, target) in [
             (ScaleMode::Major, 60, vec![]),
-            (
-                ScaleMode::Minor,
-                60,
-                vec![NoteLetter::B, NoteLetter::A, NoteLetter::E],
-            ),
+            (ScaleMode::Minor, 60, vec![NL::B, NL::A, NL::E]),
             (ScaleMode::Major, 62, vec![]),
-            (ScaleMode::Major, 17, vec![NoteLetter::B]),
-            (
-                ScaleMode::Minor,
-                17,
-                vec![NoteLetter::E, NoteLetter::D, NoteLetter::B, NoteLetter::A],
-            ),
+            (ScaleMode::Major, 17, vec![NL::B]),
+            (ScaleMode::Minor, 17, vec![NL::E, NL::D, NL::B, NL::A]),
             (
                 ScaleMode::Major,
                 61,
-                vec![
-                    NoteLetter::D,
-                    NoteLetter::B,
-                    NoteLetter::A,
-                    NoteLetter::G,
-                    NoteLetter::E,
-                ],
+                vec![NL::D, NL::B, NL::A, NL::G, NL::E],
             ),
         ] {
             let rooted = scale.rooted(NoteName::name_of(root));
@@ -1624,29 +1649,16 @@ B  Major ([59, 63, 66])";
         for (scale, root, target) in [
             (ScaleMode::Major, 60, vec![]),
             (ScaleMode::Minor, 60, vec![]),
-            (ScaleMode::Major, 62, vec![NoteLetter::C, NoteLetter::F]),
+            (ScaleMode::Major, 62, vec![NL::C, NL::F]),
             (
                 ScaleMode::Major,
                 59,
-                vec![
-                    NoteLetter::A,
-                    NoteLetter::G,
-                    NoteLetter::F,
-                    NoteLetter::D,
-                    NoteLetter::C,
-                ],
+                vec![NL::A, NL::G, NL::F, NL::D, NL::C],
             ),
             (
                 ScaleMode::Major,
                 18,
-                vec![
-                    NoteLetter::F,
-                    NoteLetter::E,
-                    NoteLetter::D,
-                    NoteLetter::C,
-                    NoteLetter::A,
-                    NoteLetter::G,
-                ],
+                vec![NL::F, NL::E, NL::D, NL::C, NL::A, NL::G],
             ),
         ] {
             let rooted = scale.rooted(NoteName::name_of(root));
@@ -1675,62 +1687,62 @@ B  Major ([59, 63, 66])";
         for (scale, letter, expected) in [
             (
                 ScaleMode::Major,
-                NoteLetter::D,
+                NL::D,
                 vec![
-                    NoteLetter::D,
-                    NoteLetter::E,
-                    NoteLetter::F,
-                    NoteLetter::G,
-                    NoteLetter::A,
-                    NoteLetter::B,
-                    NoteLetter::C,
-                    NoteLetter::D,
-                    NoteLetter::E,
+                    NL::D,
+                    NL::E,
+                    NL::F,
+                    NL::G,
+                    NL::A,
+                    NL::B,
+                    NL::C,
+                    NL::D,
+                    NL::E,
                 ],
             ),
             (
                 ScaleMode::Minor,
-                NoteLetter::A,
+                NL::A,
                 vec![
-                    NoteLetter::A,
-                    NoteLetter::B,
-                    NoteLetter::C,
-                    NoteLetter::D,
-                    NoteLetter::E,
-                    NoteLetter::F,
-                    NoteLetter::G,
-                    NoteLetter::A,
-                    NoteLetter::B,
+                    NL::A,
+                    NL::B,
+                    NL::C,
+                    NL::D,
+                    NL::E,
+                    NL::F,
+                    NL::G,
+                    NL::A,
+                    NL::B,
                 ],
             ),
             (
                 ScaleMode::Dorian,
-                NoteLetter::F,
+                NL::F,
                 vec![
-                    NoteLetter::F,
-                    NoteLetter::G,
-                    NoteLetter::A,
-                    NoteLetter::B,
-                    NoteLetter::C,
-                    NoteLetter::D,
-                    NoteLetter::E,
-                    NoteLetter::F,
-                    NoteLetter::G,
+                    NL::F,
+                    NL::G,
+                    NL::A,
+                    NL::B,
+                    NL::C,
+                    NL::D,
+                    NL::E,
+                    NL::F,
+                    NL::G,
                 ],
             ),
             (
                 ScaleMode::Augmented,
-                NoteLetter::C,
+                NL::C,
                 vec![
-                    NoteLetter::C,
-                    NoteLetter::D,
-                    NoteLetter::E,
-                    NoteLetter::G,
-                    NoteLetter::G,
-                    NoteLetter::B,
-                    NoteLetter::C,
-                    NoteLetter::D,
-                    NoteLetter::E,
+                    NL::C,
+                    NL::D,
+                    NL::E,
+                    NL::G,
+                    NL::G,
+                    NL::B,
+                    NL::C,
+                    NL::D,
+                    NL::E,
                 ],
             ),
         ] {
@@ -1793,41 +1805,33 @@ B  Major ([59, 63, 66])";
             expected_pitch,
             expected_ascend,
         ) in [
-            (
-                ScaleMode::Major,
-                60,
-                72,
-                NoteLetter::C,
-                Accidental::Natural,
-                72,
-                None,
-            ),
+            (ScaleMode::Major, 60, 72, NL::C, A::Natural, 72, None),
             (
                 ScaleMode::Major,
                 60,
                 73,
-                NoteLetter::C,
-                Accidental::Natural,
+                NL::C,
+                A::Natural,
                 72,
-                Some(Accidental::Sharp),
+                Some(A::Sharp),
             ),
             (
                 ScaleMode::Major,
                 59,
                 65,
-                NoteLetter::E,
-                Accidental::Natural,
+                NL::E,
+                A::Natural,
                 64,
-                Some(Accidental::Sharp),
+                Some(A::Sharp),
             ),
             (
                 ScaleMode::Major,
                 59,
                 67,
-                NoteLetter::G,
-                Accidental::Sharp,
+                NL::G,
+                A::Sharp,
                 68,
-                Some(Accidental::Natural),
+                Some(A::Natural),
             ),
         ] {
             let rooted = scale.rooted(NoteName::name_of(root));
@@ -1850,41 +1854,33 @@ B  Major ([59, 63, 66])";
             expected_pitch,
             expected_descend,
         ) in [
-            (
-                ScaleMode::Major,
-                60,
-                72,
-                NoteLetter::C,
-                Accidental::Natural,
-                72,
-                None,
-            ),
+            (ScaleMode::Major, 60, 72, NL::C, A::Natural, 72, None),
             (
                 ScaleMode::Major,
                 60,
                 73,
-                NoteLetter::D,
-                Accidental::Natural,
+                NL::D,
+                A::Natural,
                 74,
-                Some(Accidental::Flat),
+                Some(A::Flat),
             ),
             (
                 ScaleMode::Major,
                 61,
                 71,
-                NoteLetter::C,
-                Accidental::Natural,
+                NL::C,
+                A::Natural,
                 72,
-                Some(Accidental::Flat),
+                Some(A::Flat),
             ),
             (
                 ScaleMode::Major,
                 61,
                 69,
-                NoteLetter::A,
-                Accidental::Flat,
+                NL::A,
+                A::Flat,
                 68,
-                Some(Accidental::Natural),
+                Some(A::Natural),
             ),
         ] {
             let rooted = scale.rooted(NoteName::name_of(root));
@@ -1900,98 +1896,86 @@ B  Major ([59, 63, 66])";
     fn test_chord_notes() {
         for (letter, modifier, mode, notes) in [
             (
-                NoteLetter::C,
-                Accidental::Natural,
+                NL::C,
+                A::Natural,
                 ChordMode::Major,
                 vec![
-                    (NoteLetter::C, Accidental::Natural),
-                    (NoteLetter::E, Accidental::Natural),
-                    (NoteLetter::G, Accidental::Natural),
+                    (NL::C, A::Natural),
+                    (NL::E, A::Natural),
+                    (NL::G, A::Natural),
                 ],
             ),
             (
-                NoteLetter::D,
-                Accidental::Natural,
+                NL::D,
+                A::Natural,
                 ChordMode::Major,
-                vec![
-                    (NoteLetter::D, Accidental::Natural),
-                    (NoteLetter::F, Accidental::Sharp),
-                    (NoteLetter::A, Accidental::Natural),
-                ],
+                vec![(NL::D, A::Natural), (NL::F, A::Sharp), (NL::A, A::Natural)],
             ),
             (
-                NoteLetter::E,
-                Accidental::Flat,
+                NL::E,
+                A::Flat,
                 ChordMode::Major,
-                vec![
-                    (NoteLetter::E, Accidental::Flat),
-                    (NoteLetter::G, Accidental::Natural),
-                    (NoteLetter::B, Accidental::Flat),
-                ],
+                vec![(NL::E, A::Flat), (NL::G, A::Natural), (NL::B, A::Flat)],
             ),
             (
-                NoteLetter::G,
-                Accidental::Natural,
+                NL::G,
+                A::Natural,
                 ChordMode::Dominant7,
                 vec![
-                    (NoteLetter::G, Accidental::Natural),
-                    (NoteLetter::B, Accidental::Natural),
-                    (NoteLetter::D, Accidental::Natural),
-                    (NoteLetter::F, Accidental::Natural),
+                    (NL::G, A::Natural),
+                    (NL::B, A::Natural),
+                    (NL::D, A::Natural),
+                    (NL::F, A::Natural),
                 ],
             ),
             (
-                NoteLetter::G,
-                Accidental::Natural,
+                NL::G,
+                A::Natural,
                 ChordMode::Minor,
-                vec![
-                    (NoteLetter::G, Accidental::Natural),
-                    (NoteLetter::B, Accidental::Flat),
-                    (NoteLetter::D, Accidental::Natural),
-                ],
+                vec![(NL::G, A::Natural), (NL::B, A::Flat), (NL::D, A::Natural)],
             ),
             (
-                NoteLetter::G,
-                Accidental::Natural,
+                NL::G,
+                A::Natural,
                 ChordMode::Minor7,
                 vec![
-                    (NoteLetter::G, Accidental::Natural),
-                    (NoteLetter::B, Accidental::Flat),
-                    (NoteLetter::D, Accidental::Natural),
-                    (NoteLetter::F, Accidental::Natural),
+                    (NL::G, A::Natural),
+                    (NL::B, A::Flat),
+                    (NL::D, A::Natural),
+                    (NL::F, A::Natural),
                 ],
             ),
             (
-                NoteLetter::G,
-                Accidental::Natural,
+                NL::G,
+                A::Natural,
                 ChordMode::HalfDiminished7,
                 vec![
-                    (NoteLetter::G, Accidental::Natural),
-                    (NoteLetter::B, Accidental::Flat),
-                    (NoteLetter::D, Accidental::Flat),
-                    (NoteLetter::F, Accidental::Natural),
+                    (NL::G, A::Natural),
+                    (NL::B, A::Flat),
+                    (NL::D, A::Flat),
+                    (NL::F, A::Natural),
                 ],
             ),
             (
-                NoteLetter::G,
-                Accidental::Sharp,
+                NL::G,
+                A::Sharp,
                 ChordMode::Diminished7,
                 vec![
-                    (NoteLetter::G, Accidental::Sharp),
-                    (NoteLetter::B, Accidental::Natural),
-                    (NoteLetter::D, Accidental::Natural),
-                    (NoteLetter::F, Accidental::Natural),
+                    (NL::G, A::Sharp),
+                    (NL::B, A::Natural),
+                    (NL::D, A::Natural),
+                    (NL::F, A::Natural),
                 ],
             ),
             (
-                NoteLetter::G,
-                Accidental::Natural,
+                NL::G,
+                A::Natural,
                 ChordMode::Diminished7,
                 vec![
-                    (NoteLetter::G, Accidental::Natural),
-                    (NoteLetter::B, Accidental::Flat),
-                    (NoteLetter::D, Accidental::Flat),
-                    (NoteLetter::F, Accidental::Flat),
+                    (NL::G, A::Natural),
+                    (NL::B, A::Flat),
+                    (NL::D, A::Flat),
+                    (NL::F, A::Flat),
                 ],
             ),
         ] {
@@ -2006,6 +1990,36 @@ B  Major ([59, 63, 66])";
                 .map(|(letter, modifier)| NoteName { letter, modifier })
                 .collect::<Vec<_>>();
             assert_eq!(expected, chord_name.note_names());
+        }
+    }
+
+    #[test]
+    fn test_missing_chord_notes_from() {
+        for (chord_root, chord_mode, scale_root, scale_mode, expected) in [
+            (60, ChordMode::Major, 60, ScaleMode::Major, vec![]),
+            (
+                62,
+                ChordMode::Major,
+                60,
+                ScaleMode::Major,
+                vec![(NL::F, A::Sharp)],
+            ),
+        ] {
+            let chord_root = NoteName::name_of(chord_root);
+            let scale_root = NoteName::name_of(scale_root);
+            let chord_name = ChordName {
+                letter: chord_root.letter,
+                modifier: chord_root.modifier,
+                mode: chord_mode,
+            };
+            let rooted_scale = scale_mode.rooted(scale_root);
+            let missing = chord_name.missing_chord_tones_from(&rooted_scale);
+            let expected_missing = expected
+                .iter()
+                .copied()
+                .map(|(letter, modifier)| NoteName { letter, modifier })
+                .collect::<Vec<_>>();
+            assert_eq!(expected_missing, missing);
         }
     }
 }
