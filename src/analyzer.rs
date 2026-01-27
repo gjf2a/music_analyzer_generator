@@ -1,4 +1,7 @@
+use std::{cmp::Ordering, collections::HashMap};
+
 use enum_iterator::all;
+use hash_histogram::HashHistogram;
 
 use crate::{ChordName, NoteName, PitchSequence, RootedScale, ScaleMode};
 use midi_note_recorder::Recording;
@@ -6,6 +9,7 @@ use midi_note_recorder::Recording;
 #[derive(Debug)]
 pub struct ChordProgression {
     chords_starts: Vec<(ChordName, f64)>,
+    duration: f64,
 }
 
 impl ChordProgression {
@@ -45,7 +49,24 @@ impl ChordProgression {
                 }
             }
         }
-        result.sort_by_key(|(count, _)| *count);
+        let weighted_roots = self.total_note_weights().ranking();
+        let ranks = weighted_roots
+            .iter()
+            .enumerate()
+            .map(|(i, n)| (*n, i))
+            .collect::<HashMap<_, _>>();
+        result.sort_by(|(c1, s1), (c2, s2)| {
+            if *c1 < *c2 {
+                Ordering::Less
+            } else if *c1 > *c2 {
+                Ordering::Greater
+            } else {
+                ranks
+                    .get(&s1.root)
+                    .unwrap()
+                    .cmp(ranks.get(&s2.root).unwrap())
+            }
+        });
         result
     }
 
@@ -57,6 +78,21 @@ impl ChordProgression {
             .take_while(|(c, _)| *c == min_miss)
             .map(|(_, rs)| rs.clone())
             .collect()
+    }
+
+    pub fn total_note_weights(&self) -> HashHistogram<NoteName, f64> {
+        let mut note_histogram = HashHistogram::new();
+        for i in 0..self.len() {
+            let next_start = if i < self.len() - 1 {
+                self.chords_starts[i + 1].1
+            } else {
+                self.duration
+            };
+            for note in self.chords_starts[i].0.note_names() {
+                note_histogram.bump_by(&note, next_start - self.chords_starts[i].1);
+            }
+        }
+        note_histogram
     }
 }
 
@@ -71,7 +107,10 @@ impl From<&Recording> for ChordProgression {
                 chords_starts.push((chord.name(), start));
             }
         }
-        Self { chords_starts }
+        Self {
+            chords_starts,
+            duration: recording.duration(),
+        }
     }
 }
 
@@ -95,31 +134,31 @@ mod tests {
                 "healing4",
                 vec![
                     (1, SM::Major, NoteName { ltr: NL::E, acc: N }),
-                    (1, SM::Lydian, NoteName { ltr: NL::A, acc: N }),
                     (1, SM::Mixolydian, NoteName { ltr: NL::B, acc: N }),
+                    (1, SM::Lydian, NoteName { ltr: NL::A, acc: N }),
                 ],
             ),
             (
                 "take5",
                 vec![
-                    (0, SM::Minor, NoteName { ltr: NL::E, acc: F }),
                     (0, SM::Minor, NoteName { ltr: NL::B, acc: F }),
-                    (0, SM::Dorian, NoteName { ltr: NL::E, acc: F }),
                     (0, SM::Phrygian, NoteName { ltr: NL::B, acc: F }),
                     (0, SM::HarmonicMinor, NoteName { ltr: NL::B, acc: F }),
-                    (0, SM::MelodicMinor, NoteName { ltr: NL::E, acc: F }),
                     (0, SM::MelodicMinor, NoteName { ltr: NL::B, acc: F }),
+                    (0, SM::Minor, NoteName { ltr: NL::E, acc: F }),
+                    (0, SM::Dorian, NoteName { ltr: NL::E, acc: F }),
+                    (0, SM::MelodicMinor, NoteName { ltr: NL::E, acc: F }),
                 ],
             ),
             (
                 "SimpleA",
                 vec![
-                    (0, SM::Major, NoteName { ltr: NL::E, acc: N }),
                     (0, SM::Major, NoteName { ltr: NL::A, acc: N }),
+                    (0, SM::Lydian, NoteName { ltr: NL::A, acc: N }),
+                    (0, SM::Major, NoteName { ltr: NL::E, acc: N }),
+                    (0, SM::Mixolydian, NoteName { ltr: NL::E, acc: N }),
                     (0, SM::Minor, NoteName { ltr: NL::F, acc: S }),
                     (0, SM::Dorian, NoteName { ltr: NL::F, acc: S }),
-                    (0, SM::Lydian, NoteName { ltr: NL::A, acc: N }),
-                    (0, SM::Mixolydian, NoteName { ltr: NL::E, acc: N }),
                     (0, SM::MelodicMinor, NoteName { ltr: NL::F, acc: S }),
                 ],
             ),
@@ -131,7 +170,6 @@ mod tests {
                 .iter()
                 .map(|(c, r)| (*c, r.mode, r.root))
                 .collect::<Vec<_>>();
-            println!("{readable:?}");
             let closest_match = progression.closest_matching_scales();
             assert_eq!(closest.len(), closest_match.len());
 
