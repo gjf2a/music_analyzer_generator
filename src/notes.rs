@@ -226,7 +226,7 @@ mod tests {
     use crate::notes::NoteLetter as NL;
     use crate::notes::NoteName;
 
-#[test]
+    #[test]
     fn test_note_names() {
         let note_name = [
             (60, NL::C, N),

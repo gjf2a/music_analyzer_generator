@@ -441,16 +441,13 @@ impl ScalePattern {
 mod tests {
     use std::collections::VecDeque;
 
-    use crate::{
-        MAJOR_ROOT_IDS, MINOR_ROOT_IDS, NoteName,
-    };
+    use crate::{MAJOR_ROOT_IDS, MINOR_ROOT_IDS, NoteName};
 
     use crate::notes::Accidental::Flat as F;
     use crate::notes::Accidental::Natural as N;
     use crate::notes::Accidental::Sharp as S;
     use crate::notes::NoteLetter as NL;
     use crate::scales::ScaleMode as SM;
-
 
     #[test]
     fn test_ascending_scale() {
@@ -475,7 +472,6 @@ mod tests {
             ]
         );
     }
-
 
     #[test]
     fn test_note_up() {
@@ -965,5 +961,4 @@ mod tests {
             assert_eq!(expected_descend, descend);
         }
     }
-
 }

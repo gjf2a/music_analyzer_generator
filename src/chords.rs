@@ -234,7 +234,7 @@ mod tests {
     use crate::notes::Accidental::Sharp as S;
     use crate::notes::NoteLetter as NL;
     use crate::notes::NoteName;
-    
+
     #[test]
     fn test_chord_notes() {
         for (letter, modifier, mode, notes) in [
@@ -302,5 +302,4 @@ mod tests {
             assert_eq!(expected, chord_name.note_names());
         }
     }
-
 }

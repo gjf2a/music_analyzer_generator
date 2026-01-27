@@ -382,9 +382,7 @@ mod tests {
     use midi_note_recorder::{Recording, midi_msg_from};
     use rand::Rng;
 
-    use crate::{
-        ActivePitches, ChordName, NoteName, PitchSequence,
-    };
+    use crate::{ActivePitches, ChordName, NoteName, PitchSequence};
 
     use crate::chords::ChordMode as CM;
     use crate::notes::Accidental::Flat as F;
