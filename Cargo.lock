@@ -448,9 +448,9 @@ dependencies = [
 
 [[package]]
 name = "hash_histogram"
-version = "0.10.1"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3fa18daa8e5092bccf460df4eab48ead385ffe7a940b0271e869d26753b7923"
+checksum = "bde148a8bbfc421d1a1872a67d8bf9c9203de53ae8ad27abb56261ae18d55cc9"
 dependencies = [
  "num",
  "serde",

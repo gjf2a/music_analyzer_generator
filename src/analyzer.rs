@@ -2,6 +2,7 @@ use std::{cmp::Ordering, collections::HashMap};
 
 use enum_iterator::all;
 use hash_histogram::HashHistogram;
+use midi_fundsp::note_velocity_from;
 
 use crate::{ChordName, NoteName, PitchSequence, RootedScale, ScaleMode};
 use midi_note_recorder::Recording;
@@ -114,6 +115,70 @@ impl From<&Recording> for ChordProgression {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
+pub struct Note {
+    pitch: u8,
+    velocity: u8,
+    duration: f64,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Melody {
+    notes: Vec<Note>,
+}
+
+impl From<PitchSequence> for Melody {
+    fn from(value: PitchSequence) -> Self {
+        let mut notes: Vec<Note> = vec![];
+        let mut pending_start = None;
+        for (time, msg, _) in value.seq.iter() {
+            if let Some(prev) = notes.last_mut() {
+                if let Some(start) = pending_start {
+                    prev.duration = *time - start;
+                    pending_start = None;
+                }
+            }
+            if let Some((pitch, velocity)) = note_velocity_from(msg) {
+                if velocity > 0 {
+                    notes.push(Note {
+                        pitch,
+                        velocity,
+                        duration: 0.0,
+                    });
+                    pending_start = Some(*time);
+                }
+            }
+        }
+        Self { notes }
+    }
+}
+
+impl Melody {
+    pub fn total_note_weights(&self, scale: &RootedScale) -> HashHistogram<NoteName, f64> {
+        let mut result = HashHistogram::new();
+        let mut prev_pitch = None;
+        for note in self.notes.iter() {
+            let mut ascending = true;
+            if let Some(prev_pitch) = prev_pitch {
+                ascending = prev_pitch <= note.pitch;
+            }
+            let symbol = if ascending {
+                scale.name_of_ascending(note.pitch)
+            } else {
+                scale.name_of(note.pitch)
+            };
+            if let Some(symbol) = symbol {
+                result.bump_by(&symbol, note.duration);
+            }
+
+            if prev_pitch.is_none() || prev_pitch.unwrap() != note.pitch {
+                prev_pitch = Some(note.pitch);
+            }
+        }
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use midi_note_recorder::Recording;
@@ -133,33 +198,33 @@ mod tests {
             (
                 "healing4",
                 vec![
-                    (1, SM::Major, NoteName { ltr: NL::E, acc: N }),
-                    (1, SM::Mixolydian, NoteName { ltr: NL::B, acc: N }),
-                    (1, SM::Lydian, NoteName { ltr: NL::A, acc: N }),
+                    (1, SM::Major, NoteName::new(NL::E, N)),
+                    (1, SM::Mixolydian, NoteName::new(NL::B, N)),
+                    (1, SM::Lydian, NoteName::new(NL::A, N)),
                 ],
             ),
             (
                 "take5",
                 vec![
-                    (0, SM::Minor, NoteName { ltr: NL::B, acc: F }),
-                    (0, SM::Phrygian, NoteName { ltr: NL::B, acc: F }),
-                    (0, SM::HarmonicMinor, NoteName { ltr: NL::B, acc: F }),
-                    (0, SM::MelodicMinor, NoteName { ltr: NL::B, acc: F }),
-                    (0, SM::Minor, NoteName { ltr: NL::E, acc: F }),
-                    (0, SM::Dorian, NoteName { ltr: NL::E, acc: F }),
-                    (0, SM::MelodicMinor, NoteName { ltr: NL::E, acc: F }),
+                    (0, SM::Minor, NoteName::new(NL::B, F)),
+                    (0, SM::Phrygian, NoteName::new(NL::B, F)),
+                    (0, SM::HarmonicMinor, NoteName::new(NL::B, F)),
+                    (0, SM::MelodicMinor, NoteName::new(NL::B, F)),
+                    (0, SM::Minor, NoteName::new(NL::E, F)),
+                    (0, SM::Dorian, NoteName::new(NL::E, F)),
+                    (0, SM::MelodicMinor, NoteName::new(NL::E, F)),
                 ],
             ),
             (
                 "SimpleA",
                 vec![
-                    (0, SM::Major, NoteName { ltr: NL::A, acc: N }),
-                    (0, SM::Lydian, NoteName { ltr: NL::A, acc: N }),
-                    (0, SM::Major, NoteName { ltr: NL::E, acc: N }),
-                    (0, SM::Mixolydian, NoteName { ltr: NL::E, acc: N }),
-                    (0, SM::Minor, NoteName { ltr: NL::F, acc: S }),
-                    (0, SM::Dorian, NoteName { ltr: NL::F, acc: S }),
-                    (0, SM::MelodicMinor, NoteName { ltr: NL::F, acc: S }),
+                    (0, SM::Major, NoteName::new(NL::A, N)),
+                    (0, SM::Lydian, NoteName::new(NL::A, N)),
+                    (0, SM::Major, NoteName::new(NL::E, N)),
+                    (0, SM::Mixolydian, NoteName::new(NL::E, N)),
+                    (0, SM::Minor, NoteName::new(NL::F, S)),
+                    (0, SM::Dorian, NoteName::new(NL::F, S)),
+                    (0, SM::MelodicMinor, NoteName::new(NL::F, S)),
                 ],
             ),
         ] {
