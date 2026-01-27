@@ -4,7 +4,10 @@ use enum_iterator::all;
 use hash_histogram::HashHistogram;
 use midi_fundsp::note_velocity_from;
 
-use crate::{ChordName, NoteName, PitchSequence, RootedScale, ScaleMode};
+use crate::{
+    ChordName, NoteName, PitchSequence,
+    scales::{RootedScale, ScaleMode},
+};
 use midi_note_recorder::Recording;
 
 #[derive(Debug)]
@@ -28,7 +31,8 @@ impl ChordProgression {
 
     pub fn has_root_chord(&self, scale: &RootedScale) -> bool {
         self.chord_iter().any(|chord| {
-            scale.root == chord.root_name() && chord.missing_chord_tones_from(scale).len() == 0
+            scale.root_name() == chord.root_name()
+                && chord.missing_chord_tones_from(scale).len() == 0
         })
     }
 
@@ -63,9 +67,9 @@ impl ChordProgression {
                 Ordering::Greater
             } else {
                 ranks
-                    .get(&s1.root)
+                    .get(&s1.root_name())
                     .unwrap()
-                    .cmp(ranks.get(&s2.root).unwrap())
+                    .cmp(ranks.get(&s2.root_name()).unwrap())
             }
         });
         result
@@ -183,14 +187,14 @@ impl Melody {
 mod tests {
     use midi_note_recorder::Recording;
 
-    use crate::NoteName;
     use crate::analyzer::ChordProgression;
+    use crate::notes::NoteName;
 
-    use crate::Accidental::Flat as F;
-    use crate::Accidental::Natural as N;
-    use crate::Accidental::Sharp as S;
-    use crate::NoteLetter as NL;
-    use crate::ScaleMode as SM;
+    use crate::notes::Accidental::Flat as F;
+    use crate::notes::Accidental::Natural as N;
+    use crate::notes::Accidental::Sharp as S;
+    use crate::notes::NoteLetter as NL;
+    use crate::scales::ScaleMode as SM;
 
     #[test]
     fn test_progressions() {
@@ -233,15 +237,15 @@ mod tests {
             let mismatches = progression.scale_mismatches_for();
             let readable = mismatches
                 .iter()
-                .map(|(c, r)| (*c, r.mode, r.root))
+                .map(|(c, r)| (*c, r.mode(), r.root_name()))
                 .collect::<Vec<_>>();
             let closest_match = progression.closest_matching_scales();
             assert_eq!(closest.len(), closest_match.len());
 
             for i in 0..closest.len() {
                 assert_eq!(closest[i], readable[i]);
-                assert_eq!(closest[i].1, closest_match[i].mode);
-                assert_eq!(closest[i].2, closest_match[i].root);
+                assert_eq!(closest[i].1, closest_match[i].mode());
+                assert_eq!(closest[i].2, closest_match[i].root_name());
             }
         }
     }
