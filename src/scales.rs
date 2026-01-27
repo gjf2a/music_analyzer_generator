@@ -436,3 +436,534 @@ impl ScalePattern {
         Self::standard(destination)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::VecDeque;
+
+    use crate::{
+        MAJOR_ROOT_IDS, MINOR_ROOT_IDS, NoteName,
+    };
+
+    use crate::notes::Accidental::Flat as F;
+    use crate::notes::Accidental::Natural as N;
+    use crate::notes::Accidental::Sharp as S;
+    use crate::notes::NoteLetter as NL;
+    use crate::scales::ScaleMode as SM;
+
+
+    #[test]
+    fn test_ascending_scale() {
+        let scale = SM::Major.rooted(NoteName::new(NL::C, N));
+        let c_notes = scale.notes_going_up().collect::<Vec<_>>();
+        assert_eq!(
+            c_notes[..15],
+            vec![0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17, 19, 21, 23, 24]
+        );
+    }
+
+    #[test]
+    fn test_descending_scale() {
+        let c_notes = SM::Major
+            .rooted(NoteName::new(NL::C, N))
+            .notes_going_down()
+            .collect::<Vec<_>>();
+        assert_eq!(
+            c_notes[..15],
+            vec![
+                120, 119, 117, 115, 113, 112, 110, 108, 107, 105, 103, 101, 100, 98, 96
+            ]
+        );
+    }
+
+
+    #[test]
+    fn test_note_up() {
+        let root1 = NoteName::new(NL::C, N);
+        let root2 = NoteName::new(NL::F, S);
+        let root3 = NoteName::new(NL::B, F);
+        for (root, mode, current, interval, expected) in [
+            (root1, SM::Major, 60, 3, 64),
+            (root1, SM::Minor, 60, 3, 63),
+            (root1, SM::Phrygian, 60, 2, 61),
+            (root2, SM::MelodicMinor, 66, 1, 66),
+            (root2, SM::MelodicMinor, 66, 6, 75),
+            (root3, SM::MelodicMinor, 58, 7, 69),
+        ] {
+            let scale = mode.rooted(root);
+            assert_eq!(scale.note_up(current, interval).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn test_note_down() {
+        let root1 = NoteName::new(NL::C, N);
+        let root2 = NoteName::new(NL::F, S);
+        let root3 = NoteName::new(NL::B, F);
+        for (root, mode, current, interval, expected) in [
+            (root1, SM::Major, 60, 3, 57),
+            (root1, SM::Minor, 60, 3, 56),
+            (root1, SM::Phrygian, 60, 2, 58),
+            (root2, SM::MelodicMinor, 66, 2, 64),
+            (root2, SM::MelodicMinor, 66, 3, 62),
+            (root3, SM::MelodicMinor, 58, 7, 48),
+        ] {
+            let scale = mode.rooted(root);
+            assert_eq!(scale.note_down(current, interval).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn test_middle_c() {
+        let expected = [60, 60, 61, 60, 61, 60, 61, 60, 60, 61, 60, 61];
+        for i in 0..expected.len() {
+            let note = NoteName::new(MAJOR_ROOT_IDS[i].0, MAJOR_ROOT_IDS[i].1);
+            assert_eq!(expected[i], SM::Major.rooted(note).middle_c());
+        }
+    }
+
+    #[test]
+    fn test_diatonic_intervals() {
+        for (root, mode, p1, p2, expected) in [
+            (71, SM::Major, 70, 75, Some(3)),
+            (71, SM::Major, 75, 70, Some(3)),
+            (71, SM::Major, 70, 74, None),
+            (67, SM::Major, 71, 71, Some(0)),
+            (62, SM::Dorian, 65, 74, Some(5)),
+        ] {
+            let root = NoteName::name_of(root);
+            let scale = mode.rooted(root);
+            assert_eq!(scale.diatonic_steps_between(p1, p2), expected);
+        }
+    }
+
+    #[test]
+    fn test_round_up() {
+        for (root, mode, pitch, expected) in [(65, SM::Major, 71, 72), (65, SM::Major, 72, 72)] {
+            let root = NoteName::name_of(root);
+            let scale = mode.rooted(root);
+            assert_eq!(scale.round_up(pitch), expected);
+        }
+    }
+
+    #[test]
+    fn test_round_down() {
+        for (root, mode, pitch, expected) in [(65, SM::Major, 71, 70), (65, SM::Major, 72, 72)] {
+            let root = NoteName::name_of(root);
+            let scale = mode.rooted(root);
+            assert_eq!(scale.round_down(pitch), expected);
+        }
+    }
+
+    #[test]
+    fn test_note_letters() {
+        for (scale, root, letters) in [
+            (
+                SM::Major,
+                60,
+                [
+                    (0, NL::C),
+                    (2, NL::D),
+                    (4, NL::E),
+                    (5, NL::F),
+                    (7, NL::G),
+                    (9, NL::A),
+                    (11, NL::B),
+                    (12, NL::C),
+                    (14, NL::D),
+                    (16, NL::E),
+                    (17, NL::F),
+                    (19, NL::G),
+                    (21, NL::A),
+                    (23, NL::B),
+                    (24, NL::C),
+                ],
+            ),
+            (
+                SM::Major,
+                59,
+                [
+                    (11, NL::B),
+                    (13, NL::C),
+                    (15, NL::D),
+                    (16, NL::E),
+                    (18, NL::F),
+                    (20, NL::G),
+                    (22, NL::A),
+                    (23, NL::B),
+                    (25, NL::C),
+                    (27, NL::D),
+                    (28, NL::E),
+                    (30, NL::F),
+                    (32, NL::G),
+                    (34, NL::A),
+                    (35, NL::B),
+                ],
+            ),
+            (
+                SM::Minor,
+                58,
+                [
+                    (10, NL::B),
+                    (12, NL::C),
+                    (13, NL::D),
+                    (15, NL::E),
+                    (17, NL::F),
+                    (18, NL::G),
+                    (20, NL::A),
+                    (22, NL::B),
+                    (24, NL::C),
+                    (25, NL::D),
+                    (27, NL::E),
+                    (29, NL::F),
+                    (30, NL::G),
+                    (32, NL::A),
+                    (34, NL::B),
+                ],
+            ),
+            (
+                SM::Minor,
+                60,
+                [
+                    (0, NL::C),
+                    (2, NL::D),
+                    (3, NL::E),
+                    (5, NL::F),
+                    (7, NL::G),
+                    (8, NL::A),
+                    (10, NL::B),
+                    (12, NL::C),
+                    (14, NL::D),
+                    (15, NL::E),
+                    (17, NL::F),
+                    (19, NL::G),
+                    (20, NL::A),
+                    (22, NL::B),
+                    (24, NL::C),
+                ],
+            ),
+        ] {
+            let rooted = scale.rooted(NoteName::name_of(root));
+            let values = rooted
+                .all_diatonic_note_letters_up()
+                .take(letters.len())
+                .collect::<Vec<_>>();
+            for i in 0..letters.len() {
+                assert_eq!(values[i], letters[i]);
+            }
+        }
+    }
+
+    #[test]
+    fn test_note_name_letters() {
+        for (scale, root, letters) in [
+            (
+                SM::Major,
+                60,
+                [
+                    (0, NL::C, N),
+                    (2, NL::D, N),
+                    (4, NL::E, N),
+                    (5, NL::F, N),
+                    (7, NL::G, N),
+                    (9, NL::A, N),
+                    (11, NL::B, N),
+                    (12, NL::C, N),
+                    (14, NL::D, N),
+                    (16, NL::E, N),
+                    (17, NL::F, N),
+                    (19, NL::G, N),
+                    (21, NL::A, N),
+                    (23, NL::B, N),
+                    (24, NL::C, N),
+                ],
+            ),
+            (
+                SM::Major,
+                59,
+                [
+                    (11, NL::B, N),
+                    (13, NL::C, S),
+                    (15, NL::D, S),
+                    (16, NL::E, N),
+                    (18, NL::F, S),
+                    (20, NL::G, S),
+                    (22, NL::A, S),
+                    (23, NL::B, N),
+                    (25, NL::C, S),
+                    (27, NL::D, S),
+                    (28, NL::E, N),
+                    (30, NL::F, S),
+                    (32, NL::G, S),
+                    (34, NL::A, S),
+                    (35, NL::B, N),
+                ],
+            ),
+            (
+                SM::Minor,
+                58,
+                [
+                    (10, NL::B, F),
+                    (12, NL::C, N),
+                    (13, NL::D, F),
+                    (15, NL::E, F),
+                    (17, NL::F, N),
+                    (18, NL::G, F),
+                    (20, NL::A, F),
+                    (22, NL::B, F),
+                    (24, NL::C, N),
+                    (25, NL::D, F),
+                    (27, NL::E, F),
+                    (29, NL::F, N),
+                    (30, NL::G, F),
+                    (32, NL::A, F),
+                    (34, NL::B, F),
+                ],
+            ),
+            (
+                SM::Minor,
+                60,
+                [
+                    (0, NL::C, N),
+                    (2, NL::D, N),
+                    (3, NL::E, F),
+                    (5, NL::F, N),
+                    (7, NL::G, N),
+                    (8, NL::A, F),
+                    (10, NL::B, F),
+                    (12, NL::C, N),
+                    (14, NL::D, N),
+                    (15, NL::E, F),
+                    (17, NL::F, N),
+                    (19, NL::G, N),
+                    (20, NL::A, F),
+                    (22, NL::B, F),
+                    (24, NL::C, N),
+                ],
+            ),
+        ] {
+            let rooted = scale.rooted(NoteName::name_of(root));
+            let values = rooted
+                .all_diatonic_notes_up()
+                .take(letters.len())
+                .collect::<Vec<_>>();
+            for i in 0..letters.len() {
+                let (pitch, letter, modifier) = letters[i];
+                let name = NoteName::new(letter, modifier);
+                assert_eq!(values[i], (pitch, name));
+            }
+        }
+    }
+
+    #[test]
+    fn test_all_flats() {
+        for (scale, root, target) in [
+            (SM::Major, 60, vec![]),
+            (SM::Minor, 60, vec![NL::B, NL::A, NL::E]),
+            (SM::Major, 62, vec![]),
+            (SM::Major, 17, vec![NL::B]),
+            (SM::Minor, 17, vec![NL::E, NL::D, NL::B, NL::A]),
+            (SM::Major, 61, vec![NL::D, NL::B, NL::A, NL::G, NL::E]),
+        ] {
+            let rooted = scale.rooted(NoteName::name_of(root));
+            assert_eq!(target, rooted.all_flats().collect::<Vec<_>>());
+        }
+    }
+
+    #[test]
+    fn test_all_sharps() {
+        for (scale, root, target) in [
+            (SM::Major, 60, vec![]),
+            (SM::Minor, 60, vec![]),
+            (SM::Major, 62, vec![NL::C, NL::F]),
+            (SM::Major, 59, vec![NL::A, NL::G, NL::F, NL::D, NL::C]),
+            (
+                SM::Major,
+                18,
+                vec![NL::F, NL::E, NL::D, NL::C, NL::A, NL::G],
+            ),
+        ] {
+            let rooted = scale.rooted(NoteName::name_of(root));
+            assert_eq!(target, rooted.all_sharps().collect::<Vec<_>>());
+        }
+    }
+
+    #[test]
+    fn test_diatonic_bracket() {
+        for (scale, root, note, expected) in [
+            (SM::Major, 60, 61, Some((60, 62))),
+            (SM::Minor, 69, 61, Some((60, 62))),
+            (SM::Major, 67, 73, Some((72, 74))),
+            (SM::Major, 67, 72, None),
+            (SM::Major, 59, 67, Some((66, 68))),
+            (SM::Augmented, 60, 65, Some((64, 67))),
+            (SM::Augmented, 60, 66, Some((64, 67))),
+        ] {
+            let rooted = scale.rooted(NoteName::name_of(root));
+            assert_eq!(expected, rooted.diatonic_bracket_for(note));
+        }
+    }
+
+    #[test]
+    fn test_mode_iterator() {
+        for (scale, letter, expected) in [
+            (
+                SM::Major,
+                NL::D,
+                vec![
+                    NL::D,
+                    NL::E,
+                    NL::F,
+                    NL::G,
+                    NL::A,
+                    NL::B,
+                    NL::C,
+                    NL::D,
+                    NL::E,
+                ],
+            ),
+            (
+                SM::Minor,
+                NL::A,
+                vec![
+                    NL::A,
+                    NL::B,
+                    NL::C,
+                    NL::D,
+                    NL::E,
+                    NL::F,
+                    NL::G,
+                    NL::A,
+                    NL::B,
+                ],
+            ),
+            (
+                SM::Dorian,
+                NL::F,
+                vec![
+                    NL::F,
+                    NL::G,
+                    NL::A,
+                    NL::B,
+                    NL::C,
+                    NL::D,
+                    NL::E,
+                    NL::F,
+                    NL::G,
+                ],
+            ),
+            (
+                SM::Augmented,
+                NL::C,
+                vec![
+                    NL::C,
+                    NL::D,
+                    NL::E,
+                    NL::G,
+                    NL::G,
+                    NL::B,
+                    NL::C,
+                    NL::D,
+                    NL::E,
+                ],
+            ),
+        ] {
+            let letters = scale.letter_iterator(letter).take(9).collect::<Vec<_>>();
+            assert_eq!(expected, letters);
+        }
+    }
+
+    #[test]
+    fn test_melodic_minor() {
+        for (letter, modifier) in MINOR_ROOT_IDS.iter().copied() {
+            println!("New loop: {letter:?} {modifier:?}");
+            let root = NoteName::new(letter, modifier);
+            let scale = SM::MelodicMinor.rooted(root);
+            let mut ups = scale.all_diatonic_notes_up().collect::<VecDeque<_>>();
+            let mut dns = scale.all_diatonic_notes_down().collect::<VecDeque<_>>();
+            while ups[ups.len() - 1] != dns[0] {
+                ups.pop_back();
+            }
+            while ups[0] != dns[dns.len() - 1] && ups[0].0 < dns[dns.len() - 1].0 {
+                println!("{:?} {:?} {}", ups[0], dns[dns.len() - 1], ups.len());
+                ups.pop_front();
+            }
+            while ups[0] != dns[dns.len() - 1] && ups[0].0 > dns[dns.len() - 1].0 {
+                dns.pop_back();
+            }
+            while ups[0].1.letter() != letter {
+                ups.pop_front();
+                dns.pop_back();
+            }
+            while dns[0].1.letter() != letter {
+                ups.pop_back();
+                dns.pop_front();
+            }
+            assert_eq!(ups.len(), dns.len());
+            for ui in 0..ups.len() {
+                let di = dns.len() - ui - 1;
+                assert_eq!(ups[ui].1.letter(), dns[di].1.letter());
+                if ui % 7 < 5 {
+                    assert_eq!(ups[ui], dns[di]);
+                } else {
+                    assert_eq!(ups[ui].0, dns[di].0 + 1);
+                    assert_eq!(
+                        ups[ui].1.accidental().offset_value(),
+                        dns[di].1.accidental().offset_value() + 1
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_ascending_match() {
+        for (
+            scale,
+            root,
+            pitch,
+            expected_letter,
+            expected_modifier,
+            expected_pitch,
+            expected_ascend,
+        ) in [
+            (SM::Major, 60, 72, NL::C, N, 72, None),
+            (SM::Major, 60, 73, NL::C, N, 72, Some(S)),
+            (SM::Major, 59, 65, NL::E, N, 64, Some(S)),
+            (SM::Major, 59, 67, NL::G, S, 68, Some(N)),
+        ] {
+            let rooted = scale.rooted(NoteName::name_of(root));
+            let (name, diatonic_pitch, ascend) = rooted.ascending_match(pitch);
+            assert_eq!(expected_letter, name.letter());
+            assert_eq!(expected_modifier, name.accidental());
+            assert_eq!(expected_pitch, diatonic_pitch);
+            assert_eq!(expected_ascend, ascend);
+        }
+    }
+
+    #[test]
+    fn test_descending_match() {
+        for (
+            scale,
+            root,
+            pitch,
+            expected_letter,
+            expected_modifier,
+            expected_pitch,
+            expected_descend,
+        ) in [
+            (SM::Major, 60, 72, NL::C, N, 72, None),
+            (SM::Major, 60, 73, NL::D, N, 74, Some(F)),
+            (SM::Major, 61, 71, NL::C, N, 72, Some(F)),
+            (SM::Major, 61, 69, NL::A, F, 68, Some(N)),
+        ] {
+            let rooted = scale.rooted(NoteName::name_of(root));
+            let (name, diatonic_pitch, descend) = rooted.descending_match(pitch);
+            assert_eq!(expected_letter, name.letter());
+            assert_eq!(expected_modifier, name.accidental());
+            assert_eq!(expected_pitch, diatonic_pitch);
+            assert_eq!(expected_descend, descend);
+        }
+    }
+
+}

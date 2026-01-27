@@ -224,3 +224,83 @@ fn first_third_index(diffs: &[u8]) -> Option<usize> {
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::chords::ChordMode as CM;
+    use crate::chords::ChordName;
+    use crate::notes::Accidental::Flat as F;
+    use crate::notes::Accidental::Natural as N;
+    use crate::notes::Accidental::Sharp as S;
+    use crate::notes::NoteLetter as NL;
+    use crate::notes::NoteName;
+    
+    #[test]
+    fn test_chord_notes() {
+        for (letter, modifier, mode, notes) in [
+            (
+                NL::C,
+                N,
+                CM::Major,
+                vec![(NL::C, N), (NL::E, N), (NL::G, N)],
+            ),
+            (
+                NL::D,
+                N,
+                CM::Major,
+                vec![(NL::D, N), (NL::F, S), (NL::A, N)],
+            ),
+            (
+                NL::E,
+                F,
+                CM::Major,
+                vec![(NL::E, F), (NL::G, N), (NL::B, F)],
+            ),
+            (
+                NL::G,
+                N,
+                CM::Dominant7,
+                vec![(NL::G, N), (NL::B, N), (NL::D, N), (NL::F, N)],
+            ),
+            (
+                NL::G,
+                N,
+                CM::Minor,
+                vec![(NL::G, N), (NL::B, F), (NL::D, N)],
+            ),
+            (
+                NL::G,
+                N,
+                CM::Minor7,
+                vec![(NL::G, N), (NL::B, F), (NL::D, N), (NL::F, N)],
+            ),
+            (
+                NL::G,
+                N,
+                CM::HalfDiminished7,
+                vec![(NL::G, N), (NL::B, F), (NL::D, F), (NL::F, N)],
+            ),
+            (
+                NL::G,
+                S,
+                CM::Diminished7,
+                vec![(NL::G, S), (NL::B, N), (NL::D, N), (NL::F, N)],
+            ),
+            (
+                NL::G,
+                N,
+                CM::Diminished7,
+                vec![(NL::G, N), (NL::B, F), (NL::D, F), (NL::F, F)],
+            ),
+        ] {
+            let chord_name = ChordName::new(letter, modifier, mode);
+            let expected = notes
+                .iter()
+                .copied()
+                .map(|(letter, modifier)| NoteName::new(letter, modifier))
+                .collect::<Vec<_>>();
+            assert_eq!(expected, chord_name.note_names());
+        }
+    }
+
+}

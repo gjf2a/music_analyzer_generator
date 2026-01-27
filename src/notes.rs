@@ -219,4 +219,31 @@ impl Display for NoteName {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use crate::notes::Accidental::Flat as F;
+    use crate::notes::Accidental::Natural as N;
+    use crate::notes::Accidental::Sharp as S;
+    use crate::notes::NoteLetter as NL;
+    use crate::notes::NoteName;
+
+#[test]
+    fn test_note_names() {
+        let note_name = [
+            (60, NL::C, N),
+            (61, NL::D, F),
+            (62, NL::D, N),
+            (63, NL::E, F),
+            (64, NL::E, N),
+            (65, NL::F, N),
+            (66, NL::F, S),
+            (67, NL::G, N),
+            (68, NL::A, F),
+            (69, NL::A, N),
+            (70, NL::B, F),
+            (71, NL::B, N),
+        ];
+        for (pitch, ltr, acc) in note_name {
+            assert_eq!(NoteName::name_of(pitch), NoteName::new(ltr, acc));
+        }
+    }
+}
