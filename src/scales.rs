@@ -2,8 +2,13 @@ use std::collections::{BTreeMap, HashSet};
 
 use bare_metal_modulo::{MNum, ModNum};
 use enum_iterator::{Sequence, all};
+use hash_histogram::HashHistogram;
 
 use crate::notes::{Accidental, NoteLetter, NoteName};
+
+pub fn all_rooted_scales() -> impl Iterator<Item = RootedScale> {
+    all::<ScaleMode>().flat_map(|mode| (60..72).map(move |p| mode.rooted(NoteName::name_of(p))))
+}
 
 #[derive(Copy, Clone, Debug, Sequence, Eq, PartialEq)]
 pub enum ScaleMode {
@@ -24,6 +29,14 @@ pub enum ScaleMode {
 impl ScaleMode {
     pub fn rooted(&self, root: NoteName) -> RootedScale {
         RootedScale::new(*self, root)
+    }
+
+    fn scale_size(&self) -> usize {
+        match self {
+            Self::WholeTone | Self::Augmented => 6,
+            Self::Diminished => 8,
+            _ => 7,
+        }
     }
 
     fn pattern_up(&self) -> ScalePattern {
@@ -101,6 +114,20 @@ impl ScaleMode {
         }
         .reversed()
     }
+
+    pub fn characteristic_notes(&self) -> Vec<usize> {
+        match self {
+            Self::Major | Self::Lydian | Self::Mixolydian => vec![1, 3, 6, 7],
+            Self::Minor
+            | Self::MelodicMinor
+            | Self::HarmonicMinor
+            | Self::Dorian
+            | Self::Phrygian => vec![1, 2, 3, 6],
+            Self::Locrian => vec![1, 2, 5, 6],
+            Self::WholeTone | Self::Augmented => vec![1, 2, 3, 4, 5],
+            Self::Diminished => vec![1, 2, 3, 4, 5, 6, 7, 8],
+        }
+    }
 }
 
 pub struct ScaleLetterIterator {
@@ -130,6 +157,8 @@ impl DoubleEndedIterator for ScaleLetterIterator {
 pub struct RootedScale {
     mode: ScaleMode,
     root: NoteName,
+    note_weights_up: HashHistogram<NoteName, f64>,
+    note_weights_down: HashHistogram<NoteName, f64>,
     notes2letters_up: BTreeMap<u8, NoteLetter>,
     notes2names_up: BTreeMap<u8, NoteName>,
     notes2letters_down: BTreeMap<u8, NoteLetter>,
@@ -142,6 +171,8 @@ impl RootedScale {
         let mut result = Self {
             mode,
             root,
+            note_weights_up: HashHistogram::new(),
+            note_weights_down: HashHistogram::new(),
             notes2letters_up: BTreeMap::default(),
             notes2names_up: BTreeMap::default(),
             notes2letters_down: BTreeMap::default(),
@@ -162,7 +193,39 @@ impl RootedScale {
         for note_name in result.notes2names_down.values() {
             result.all_note_names.insert(*note_name);
         }
+        let scale_size = mode.scale_size();
+        let characteristic_tones: Vec<usize> = mode.characteristic_notes();
+        for (i, (_, note_name)) in result.notes2names_up.iter().take(scale_size).enumerate() {
+            let weight = if characteristic_tones.contains(&(i + 1)) {
+                2.0
+            } else {
+                1.0
+            };
+            result.note_weights_up.bump_by(note_name, weight);
+        }
+        result.note_weights_up.normalize();
+
+        for (i, (_, note_name)) in result.notes2names_down.iter().take(scale_size).enumerate() {
+            let tone_index = if i == 0 { 1 } else { scale_size + 2 - i };
+            let weight = if characteristic_tones.contains(&tone_index) {
+                2.0
+            } else {
+                1.0
+            };
+            result.note_weights_down.bump_by(note_name, weight);
+        }
+        result.note_weights_down.normalize();
         result
+    }
+
+    pub fn ascending_note_weight(&self, pitch: u8) -> Option<(NoteName, f64)> {
+        self.name_of_ascending(pitch)
+            .map(|name| (name, self.note_weights_up.count(&name)))
+    }
+
+    pub fn descending_note_weight(&self, pitch: u8) -> Option<(NoteName, f64)> {
+        self.name_of(pitch)
+            .map(|name| (name, self.note_weights_down.count(&name)))
     }
 
     pub fn root_name(&self) -> NoteName {

@@ -1,12 +1,11 @@
 use std::{cmp::Ordering, collections::HashMap};
 
-use enum_iterator::all;
 use hash_histogram::HashHistogram;
 use midi_fundsp::note_velocity_from;
 
 use crate::{
     ChordName, NoteName, PitchSequence,
-    scales::{RootedScale, ScaleMode},
+    scales::{RootedScale, all_rooted_scales},
 };
 use midi_note_recorder::Recording;
 
@@ -44,14 +43,10 @@ impl ChordProgression {
 
     pub fn scale_mismatches_for(&self) -> Vec<(usize, RootedScale)> {
         let mut result = vec![];
-        for mode in all::<ScaleMode>() {
-            for pitch in 60..72 {
-                let root = NoteName::name_of(pitch);
-                let scale = mode.rooted(root);
-                if self.has_root_chord(&scale) {
-                    let mismatched = self.num_mismatched_chords(&scale);
-                    result.push((mismatched, scale));
-                }
+        for scale in all_rooted_scales() {
+            if self.has_root_chord(&scale) {
+                let mismatched = self.num_mismatched_chords(&scale);
+                result.push((mismatched, scale));
             }
         }
         let weighted_roots = self.total_note_weights().ranking();
@@ -158,6 +153,14 @@ impl From<PitchSequence> for Melody {
 }
 
 impl Melody {
+    pub fn highest_weight_scale(&self) -> RootedScale {
+        all_rooted_scales()
+            .map(|scale| (scale.clone(), self.total_note_weights(&scale).total_count()))
+            .max_by(|(_,a), (_,b)| a.partial_cmp(b).unwrap())
+            .map(|(scale, _)| scale)
+            .unwrap()
+    }
+
     pub fn total_note_weights(&self, scale: &RootedScale) -> HashHistogram<NoteName, f64> {
         let mut result = HashHistogram::new();
         let mut prev_pitch = None;
@@ -166,13 +169,14 @@ impl Melody {
             if let Some(prev_pitch) = prev_pitch {
                 ascending = prev_pitch <= note.pitch;
             }
+
             let symbol = if ascending {
-                scale.name_of_ascending(note.pitch)
+                scale.ascending_note_weight(note.pitch)
             } else {
-                scale.name_of(note.pitch)
+                scale.descending_note_weight(note.pitch)
             };
-            if let Some(symbol) = symbol {
-                result.bump_by(&symbol, note.duration);
+            if let Some((symbol, weight)) = symbol {
+                result.bump_by(&symbol, note.duration * weight);
             }
 
             if prev_pitch.is_none() || prev_pitch.unwrap() != note.pitch {
@@ -248,5 +252,10 @@ mod tests {
                 assert_eq!(closest[i].2, closest_match[i].root_name());
             }
         }
+    }
+
+    #[test]
+    fn test_melody_scales() {
+        todo!("Record a few melodies using different scales and see how it does!")
     }
 }
