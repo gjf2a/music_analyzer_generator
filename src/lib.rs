@@ -176,7 +176,7 @@ impl PitchSequence {
         let mut result = vec![];
         let mut last_time = 0.0;
         for (t, _, p) in self.seq.iter() {
-            if let Some(name) = ChordName::from_active_pitches(*p) {
+            if let Some(name) = Option::<ChordName>::from(*p) {
                 if let Some((chord, time)) = pending {
                     result.push((chord, time, *t - time));
                     last_time = time;

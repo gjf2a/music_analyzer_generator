@@ -54,6 +54,12 @@ impl Display for ChordName {
     }
 }
 
+impl From<ActivePitches> for Option<ChordName> {
+    fn from(value: ActivePitches) -> Self {
+        SimpleChordInfo::new(value).map(|info| info.mode())
+    }
+}
+
 impl ChordName {
     pub fn new(letter: NoteLetter, modifier: Accidental, mode: ChordMode) -> Self {
         Self {
@@ -61,10 +67,6 @@ impl ChordName {
             modifier,
             mode,
         }
-    }
-
-    pub fn from_active_pitches(active: ActivePitches) -> Option<Self> {
-        SimpleChordInfo::new(active).map(|info| info.mode())
     }
 
     pub fn missing_chord_tones_from(&self, scale: &RootedScale) -> Vec<NoteName> {

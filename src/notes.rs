@@ -184,6 +184,11 @@ impl NoteName {
         self.acc.pitch_shift(self.ltr.natural_pitch())
     }
 
+    pub fn is_pitch_match(&self, pitch: u8) -> bool {
+        self.reference_pitch()
+            .map_or(false, |p| p % 12 == pitch % 12)
+    }
+
     pub fn synonym_of(&self, other: &NoteName) -> bool {
         if let (Some(p1), Some(p2)) = (self.reference_pitch(), other.reference_pitch()) {
             p1 == p2
@@ -244,6 +249,24 @@ mod tests {
         ];
         for (pitch, ltr, acc) in note_name {
             assert_eq!(NoteName::name_of(pitch), NoteName::new(ltr, acc));
+        }
+    }
+
+    #[test]
+    fn test_pitch_match() {
+        for (ltr, acc, candidate, is_match) in [
+            (NL::C, N, 60, true),
+            (NL::C, N, 59, false),
+            (NL::B, S, 60, true),
+            (NL::G, F, 66, true),
+            (NL::G, N, 66, false),
+            (NL::A, F, 69, false),
+            (NL::A, N, 69, true),
+            (NL::D, S, 63, true),
+            (NL::D, S, 62, false),
+        ] {
+            let name = NoteName::new(ltr, acc);
+            assert_eq!(name.is_pitch_match(candidate), is_match);
         }
     }
 }

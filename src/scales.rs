@@ -961,4 +961,11 @@ mod tests {
             assert_eq!(expected_descend, descend);
         }
     }
+
+    #[test]
+    fn exploring_find_favorite_notes() {
+        let rooted = SM::Major.rooted(NoteName::name_of(62));
+        let notes = rooted.all_diatonic_notes_up().take(15).collect::<Vec<_>>();
+        println!("{notes:?}");
+    }
 }
