@@ -116,6 +116,7 @@ impl ScaleMode {
     }
 
     pub fn characteristic_notes(&self) -> Vec<usize> {
+        // Took inspiration from this discussion: https://www.reddit.com/r/musictheory/comments/nf2qir/what_are_the_characteristic_notes_of_the_modes/
         match self {
             Self::Major | Self::Lydian | Self::Mixolydian => vec![1, 3, 4, 7],
             Self::Minor | Self::Dorian | Self::Phrygian => vec![1, 2, 3, 6],
