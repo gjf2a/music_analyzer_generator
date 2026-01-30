@@ -117,14 +117,11 @@ impl ScaleMode {
 
     pub fn characteristic_notes(&self) -> Vec<usize> {
         match self {
-            Self::Major | Self::Lydian | Self::Mixolydian => vec![1, 3, 6, 7],
-            Self::Minor
-            | Self::MelodicMinor
-            | Self::HarmonicMinor
-            | Self::Dorian
-            | Self::Phrygian => vec![1, 2, 3, 6],
+            Self::Major | Self::Lydian | Self::Mixolydian => vec![1, 3, 4, 7],
+            Self::Minor | Self::Dorian | Self::Phrygian => vec![1, 2, 3, 6],
+            Self::MelodicMinor | Self::HarmonicMinor => vec![1, 3, 6, 7],
             Self::Locrian => vec![1, 2, 5, 6],
-            Self::WholeTone | Self::Augmented => vec![1, 2, 3, 4, 5],
+            Self::WholeTone | Self::Augmented => vec![1, 2, 3, 4, 5, 6],
             Self::Diminished => vec![1, 2, 3, 4, 5, 6, 7, 8],
         }
     }

@@ -156,7 +156,7 @@ impl Melody {
     pub fn highest_weight_scale(&self) -> RootedScale {
         all_rooted_scales()
             .map(|scale| (scale.clone(), self.total_note_weights(&scale).total_count()))
-            .max_by(|(_,a), (_,b)| a.partial_cmp(b).unwrap())
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .map(|(scale, _)| scale)
             .unwrap()
     }
