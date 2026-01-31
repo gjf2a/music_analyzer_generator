@@ -7,7 +7,7 @@ use hash_histogram::HashHistogram;
 use crate::notes::{Accidental, NoteLetter, NoteName};
 
 pub fn all_rooted_scales() -> impl Iterator<Item = RootedScale> {
-    all::<ScaleMode>().flat_map(|mode| (60..72).map(move |p| mode.rooted(NoteName::name_of(p))))
+    all::<ScaleMode>().flat_map(|mode| (60..72).map(move |p| mode.pitch_rooted(p)))
 }
 
 #[derive(Copy, Clone, Debug, Sequence, Eq, PartialEq)]
@@ -29,6 +29,10 @@ pub enum ScaleMode {
 impl ScaleMode {
     pub fn rooted(&self, root: NoteName) -> RootedScale {
         RootedScale::new(*self, root)
+    }
+
+    pub fn pitch_rooted(&self, root: u8) -> RootedScale {
+        RootedScale::new(*self, NoteName::name_of(root))
     }
 
     pub fn is_symmetric(&self) -> bool {
@@ -284,7 +288,22 @@ impl RootedScale {
     }
 
     pub fn middle_c(&self) -> u8 {
-        if self.contains(60) || self.mode.is_symmetric() { 60 } else { 61 }
+        for candidate in [60, 61, 59, 62, 58] {
+            if self.contains(candidate) {
+                return candidate;
+            }
+        }
+        panic!("None of the C-adjacent notes are present in this scale.");
+    }
+
+    pub fn diatonic_steps_to_middle_c(&self, pitch: u8) -> u8 {
+        let c_major = ScaleMode::Major.pitch_rooted(60);
+        let mode = if self.mode.is_symmetric() {
+            &c_major
+        } else {
+            self
+        };
+        mode.diatonic_steps_between(mode.middle_c(), mode.round_up(pitch)).unwrap()
     }
 
     pub fn all_sharps(&self) -> impl Iterator<Item = NoteLetter> {
@@ -580,8 +599,7 @@ mod tests {
             (71, SM::Augmented, 61, 79, None),
             (71, SM::Augmented, 59, 79, Some(10)),
         ] {
-            let root = NoteName::name_of(root);
-            let scale = mode.rooted(root);
+            let scale = mode.pitch_rooted(root);
             assert_eq!(scale.diatonic_steps_between(p1, p2), expected);
         }
     }
@@ -589,8 +607,7 @@ mod tests {
     #[test]
     fn test_round_up() {
         for (root, mode, pitch, expected) in [(65, SM::Major, 71, 72), (65, SM::Major, 72, 72), (71, SM::Augmented, 79, 79)] {
-            let root = NoteName::name_of(root);
-            let scale = mode.rooted(root);
+            let scale = mode.pitch_rooted(root);
             assert_eq!(scale.round_up(pitch), expected);
         }
     }
@@ -598,8 +615,7 @@ mod tests {
     #[test]
     fn test_round_down() {
         for (root, mode, pitch, expected) in [(65, SM::Major, 71, 70), (65, SM::Major, 72, 72)] {
-            let root = NoteName::name_of(root);
-            let scale = mode.rooted(root);
+            let scale = mode.pitch_rooted(root);
             assert_eq!(scale.round_down(pitch), expected);
         }
     }
@@ -692,7 +708,7 @@ mod tests {
                 ],
             ),
         ] {
-            let rooted = scale.rooted(NoteName::name_of(root));
+            let rooted = scale.pitch_rooted(root);
             let values = rooted
                 .all_diatonic_note_letters_up()
                 .take(letters.len())
@@ -791,7 +807,7 @@ mod tests {
                 ],
             ),
         ] {
-            let rooted = scale.rooted(NoteName::name_of(root));
+            let rooted = scale.pitch_rooted(root);
             let values = rooted
                 .all_diatonic_notes_up()
                 .take(letters.len())
@@ -814,7 +830,7 @@ mod tests {
             (SM::Minor, 17, vec![NL::E, NL::D, NL::B, NL::A]),
             (SM::Major, 61, vec![NL::D, NL::B, NL::A, NL::G, NL::E]),
         ] {
-            let rooted = scale.rooted(NoteName::name_of(root));
+            let rooted = scale.pitch_rooted(root);
             assert_eq!(target, rooted.all_flats().collect::<Vec<_>>());
         }
     }
@@ -832,7 +848,7 @@ mod tests {
                 vec![NL::F, NL::E, NL::D, NL::C, NL::A, NL::G],
             ),
         ] {
-            let rooted = scale.rooted(NoteName::name_of(root));
+            let rooted = scale.pitch_rooted(root);
             assert_eq!(target, rooted.all_sharps().collect::<Vec<_>>());
         }
     }
@@ -848,7 +864,7 @@ mod tests {
             (SM::Augmented, 60, 65, Some((64, 67))),
             (SM::Augmented, 60, 66, Some((64, 67))),
         ] {
-            let rooted = scale.rooted(NoteName::name_of(root));
+            let rooted = scale.pitch_rooted(root);
             assert_eq!(expected, rooted.diatonic_bracket_for(note));
         }
     }
@@ -981,7 +997,7 @@ mod tests {
             (SM::Major, 59, 65, NL::E, N, 64, Some(S)),
             (SM::Major, 59, 67, NL::G, S, 68, Some(N)),
         ] {
-            let rooted = scale.rooted(NoteName::name_of(root));
+            let rooted = scale.pitch_rooted(root);
             let (name, diatonic_pitch, ascend) = rooted.ascending_match(pitch);
             assert_eq!(expected_letter, name.letter());
             assert_eq!(expected_modifier, name.accidental());
@@ -1006,12 +1022,23 @@ mod tests {
             (SM::Major, 61, 71, NL::C, N, 72, Some(F)),
             (SM::Major, 61, 69, NL::A, F, 68, Some(N)),
         ] {
-            let rooted = scale.rooted(NoteName::name_of(root));
+            let rooted = scale.pitch_rooted(root);
             let (name, diatonic_pitch, descend) = rooted.descending_match(pitch);
             assert_eq!(expected_letter, name.letter());
             assert_eq!(expected_modifier, name.accidental());
             assert_eq!(expected_pitch, diatonic_pitch);
             assert_eq!(expected_descend, descend);
+        }
+    }
+
+    #[test]
+    fn test_steps_to_middle_c() {
+        for (root_pitch, mode, test_pitch, target) in [
+            (60, SM::Major, 79, 11),
+            (59, SM::Augmented, 79, 11),
+        ] {
+            let scale = mode.pitch_rooted(root_pitch);
+            assert_eq!(scale.diatonic_steps_to_middle_c(test_pitch), target);
         }
     }
 }
