@@ -162,7 +162,6 @@ impl Melody {
     pub fn highest_weight_scale(&self) -> RootedScale {
         all_rooted_scales()
             .map(|scale| (scale.clone(), self.scale_score(&scale)))
-            .inspect(|(scale, weight)| if *weight > 0.0 {println!("{weight:.3} {} {:?}", scale.root_name(), scale.mode())})
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .map(|(scale, _)| scale)
             .unwrap()
@@ -183,31 +182,6 @@ impl Melody {
                 scale.descending_note_weight(note.pitch)
             };
             result += note.duration * symbol.map_or(-1.0, |(_,w)| w);
-
-            if prev_pitch.is_none() || prev_pitch.unwrap() != note.pitch {
-                prev_pitch = Some(note.pitch);
-            }
-        }
-        result
-    }
-
-    pub fn total_note_weights(&self, scale: &RootedScale) -> HashHistogram<NoteName, f64> {
-        let mut result = HashHistogram::new();
-        let mut prev_pitch = None;
-        for note in self.notes.iter() {
-            let mut ascending = true;
-            if let Some(prev_pitch) = prev_pitch {
-                ascending = prev_pitch <= note.pitch;
-            }
-
-            let symbol = if ascending {
-                scale.ascending_note_weight(note.pitch)
-            } else {
-                scale.descending_note_weight(note.pitch)
-            };
-            if let Some((symbol, weight)) = symbol {
-                result.bump_by(&symbol, note.duration * weight);
-            }
 
             if prev_pitch.is_none() || prev_pitch.unwrap() != note.pitch {
                 prev_pitch = Some(note.pitch);
