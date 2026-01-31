@@ -159,6 +159,10 @@ impl From<PitchSequence> for Melody {
 }
 
 impl Melody {
+    pub fn iter(&self) -> impl Iterator<Item=&Note> {
+        self.notes.iter()
+    }
+
     pub fn highest_weight_scale(&self) -> RootedScale {
         all_rooted_scales()
             .map(|scale| (scale.clone(), self.scale_score(&scale)))
