@@ -31,6 +31,13 @@ impl ScaleMode {
         RootedScale::new(*self, root)
     }
 
+    pub fn is_symmetric(&self) -> bool {
+        match self {
+            Self::Augmented | Self::Diminished | Self::WholeTone => true,
+            _ => false
+        }
+    }
+
     fn scale_size(&self) -> usize {
         match self {
             Self::WholeTone | Self::Augmented => 6,
@@ -277,20 +284,20 @@ impl RootedScale {
     }
 
     pub fn middle_c(&self) -> u8 {
-        if self.contains(60) { 60 } else { 61 }
+        if self.contains(60) || self.mode.is_symmetric() { 60 } else { 61 }
     }
 
     pub fn all_sharps(&self) -> impl Iterator<Item = NoteLetter> {
         self.all_diatonic_notes_down()
             .take(7)
-            .filter(|(_, n)| n.accidental() == Accidental::Sharp)
+            .filter(|(_, n)| !self.mode.is_symmetric() && n.accidental() == Accidental::Sharp)
             .map(|(_, n)| n.letter())
     }
 
     pub fn all_flats(&self) -> impl Iterator<Item = NoteLetter> {
         self.all_diatonic_notes_down()
             .take(7)
-            .filter(|(_, n)| n.accidental() == Accidental::Flat)
+            .filter(|(_, n)| !self.mode.is_symmetric() && n.accidental() == Accidental::Flat)
             .map(|(_, n)| n.letter())
     }
 
@@ -396,26 +403,6 @@ impl RootedScale {
             (self.name_of(pitch).unwrap(), pitch, None)
         }
     }
-
-    /*
-    /// Returns 0 for the Middle C/C#/Cb position.
-    /// Returns positive numbers for the treble clef.
-    /// Returns negative numbers for the bass clef.
-    pub fn staff_position(&self, pitch: u8) -> (i16, Option<Accidental>) {
-        let (pitch, acc) = if self.contains(pitch) {
-            (pitch, None)
-        } else {
-            let closest = self.closest_scale_match(pitch);
-            (closest.0, Some(closest.2))
-        };
-        let mut steps = self.diatonic_steps_between(self.middle_c(), pitch)
-                .unwrap() as i16;
-        if pitch < self.middle_c() {
-            steps = -steps;
-        }
-        (steps, acc)
-    }
-    */
 }
 
 struct ScaleUpIterator {
@@ -589,6 +576,9 @@ mod tests {
             (71, SM::Major, 70, 74, None),
             (67, SM::Major, 71, 71, Some(0)),
             (62, SM::Dorian, 65, 74, Some(5)),
+            (71, SM::Augmented, 60, 79, None),
+            (71, SM::Augmented, 61, 79, None),
+            (71, SM::Augmented, 59, 79, Some(10)),
         ] {
             let root = NoteName::name_of(root);
             let scale = mode.rooted(root);
@@ -598,7 +588,7 @@ mod tests {
 
     #[test]
     fn test_round_up() {
-        for (root, mode, pitch, expected) in [(65, SM::Major, 71, 72), (65, SM::Major, 72, 72)] {
+        for (root, mode, pitch, expected) in [(65, SM::Major, 71, 72), (65, SM::Major, 72, 72), (71, SM::Augmented, 79, 79)] {
             let root = NoteName::name_of(root);
             let scale = mode.rooted(root);
             assert_eq!(scale.round_up(pitch), expected);
