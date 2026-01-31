@@ -153,8 +153,8 @@ impl Melody {
         self.notes.iter()
     }
 
-    pub fn iter_with_prev(&self) -> PrevNoteIter<'_> {
-        PrevNoteIter { melody: self, i: 0 }
+    pub fn iter_direction(&self) -> NoteDirectionIter<'_> {
+        NoteDirectionIter { direction: MelodyDirection::Ascending, melody: self, i: 0 }
     }
 
     pub fn duration(&self) -> f64 {
@@ -178,20 +178,10 @@ impl Melody {
 
     pub fn scale_score(&self, scale: &RootedScale) -> f64 {
         let mut result = 0.0;
-        let mut ascending = true;
-        for (prev_note, note) in self.iter_with_prev() {
-            if let Some(prev_note) = prev_note {
-                if prev_note.pitch() > note.pitch() {
-                    ascending = false;
-                } else if prev_note.pitch() < note.pitch() {
-                    ascending = true;
-                }
-            }
-
-            let symbol = if ascending {
-                scale.ascending_note_weight(note.pitch())
-            } else {
-                scale.descending_note_weight(note.pitch())
+        for (note, direction) in self.iter_direction() {
+            let symbol = match direction {
+                MelodyDirection::Ascending => scale.ascending_note_weight(note.pitch()),
+                MelodyDirection::Descending => scale.descending_note_weight(note.pitch()),
             };
             result += note.duration() * symbol.map_or(-1.0, |(_, w)| w);
         }
@@ -199,26 +189,37 @@ impl Melody {
     }
 }
 
-pub struct PrevNoteIter<'a> {
-    melody: &'a Melody,
-    i: usize,
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum MelodyDirection {
+    Ascending, Descending
 }
 
-impl<'a> Iterator for PrevNoteIter<'a> {
-    type Item = (Option<Note>, Note);
+pub struct NoteDirectionIter<'a> {
+    direction: MelodyDirection,
+    melody: &'a Melody,
+    i: usize,    
+}
+
+impl<'a> Iterator for NoteDirectionIter<'a> {
+    type Item = (&'a Note, MelodyDirection);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let result = 
         if self.i >= self.melody.notes.len() {
             None
-        } else 
-        if self.i == 0 {
-            Some((None, self.melody.notes[0]))
         } else {
-            Some((Some(self.melody.notes[self.i - 1]), self.melody.notes[self.i]))
-        };
-        self.i += 1;
-        result
+            if self.i > 0 {
+                let prev_pitch = self.melody.notes[self.i - 1].pitch();
+                let current_pitch = self.melody.notes[self.i].pitch();
+                if prev_pitch < current_pitch {
+                    self.direction = MelodyDirection::Ascending;
+                } else if prev_pitch > current_pitch {
+                    self.direction = MelodyDirection::Descending;
+                }
+            }
+            let result = Some((&self.melody.notes[self.i], self.direction));
+            self.i += 1;
+            result
+        }
     }
 }
 
