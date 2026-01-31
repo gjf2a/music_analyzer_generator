@@ -153,6 +153,10 @@ impl Melody {
         self.notes.iter()
     }
 
+    pub fn duration(&self) -> f64 {
+        self.iter().map(|n| n.duration()).sum()
+    }
+
     pub fn min_max_pitches(&self) -> (u8, u8) {
         (
             self.iter().map(|n| n.pitch()).min().unwrap(),
