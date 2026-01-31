@@ -149,12 +149,20 @@ impl From<PitchSequence> for Melody {
 }
 
 impl Melody {
+    pub fn len(&self) -> usize {
+        self.notes.len()
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = &Note> {
         self.notes.iter()
     }
 
     pub fn iter_direction(&self) -> NoteDirectionIter<'_> {
-        NoteDirectionIter { direction: MelodyDirection::Ascending, melody: self, i: 0 }
+        NoteDirectionIter {
+            direction: MelodyDirection::Ascending,
+            melody: self,
+            i: 0,
+        }
     }
 
     pub fn duration(&self) -> f64 {
@@ -203,13 +211,14 @@ impl Melody {
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum MelodyDirection {
-    Ascending, Descending
+    Ascending,
+    Descending,
 }
 
 pub struct NoteDirectionIter<'a> {
     direction: MelodyDirection,
     melody: &'a Melody,
-    i: usize,    
+    i: usize,
 }
 
 impl<'a> Iterator for NoteDirectionIter<'a> {
@@ -300,6 +309,24 @@ mod tests {
                 assert_eq!(closest[i].1, closest_match[i].mode());
                 assert_eq!(closest[i].2, closest_match[i].root_name());
             }
+        }
+    }
+
+    #[test]
+    fn test_melody_lengths() {
+        for (melody_file, target) in [
+            ("Aminor", 8),
+            ("Blocrian", 8),
+            ("Cmajor", 8),
+            ("Ddorian", 8),
+            ("Ephrygian", 8),
+            ("Flydian", 8),
+            ("Gmixolydian", 8),
+        ] {
+            let recording: Recording = Recording::from_file(melody_file).unwrap();
+            let melody = Melody::from(&recording);
+            println!("{melody_file}");
+            assert_eq!(melody.len(), target);
         }
     }
 
