@@ -161,11 +161,23 @@ impl Melody {
         self.iter().map(|n| n.duration()).sum()
     }
 
-    pub fn min_max_pitches(&self) -> (u8, u8) {
-        (
-            self.iter().map(|n| n.pitch()).min().unwrap(),
-            self.iter().map(|n| n.pitch()).max().unwrap(),
-        )
+    pub fn min_max_pitches(&self) -> Option<(u8, u8)> {
+        let mut iter = self.iter();
+        if let Some(first) = iter.next() {
+            let mut min = first.pitch();
+            let mut max = min;
+            for note in iter {
+                if note.pitch() < min {
+                    min = note.pitch();
+                }
+                if note.pitch() > max {
+                    max = note.pitch();
+                }
+            }
+            Some((min, max))
+        } else {
+            None
+        }
     }
 
     pub fn highest_weight_scale(&self) -> RootedScale {
