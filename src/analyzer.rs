@@ -126,6 +126,12 @@ pub struct Melody {
     notes: Vec<Note>,
 }
 
+impl From<&Recording> for Melody {
+    fn from(value: &Recording) -> Self {
+        Self::from(PitchSequence::new(value))
+    }
+}
+
 impl From<PitchSequence> for Melody {
     fn from(value: PitchSequence) -> Self {
         let mut notes: Vec<Note> = vec![];
@@ -155,10 +161,34 @@ impl From<PitchSequence> for Melody {
 impl Melody {
     pub fn highest_weight_scale(&self) -> RootedScale {
         all_rooted_scales()
-            .map(|scale| (scale.clone(), self.total_note_weights(&scale).total_count()))
+            .map(|scale| (scale.clone(), self.scale_score(&scale)))
+            .inspect(|(scale, weight)| if *weight > 0.0 {println!("{weight:.3} {} {:?}", scale.root_name(), scale.mode())})
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .map(|(scale, _)| scale)
             .unwrap()
+    }
+
+    pub fn scale_score(&self, scale: &RootedScale) -> f64 {
+        let mut result = 0.0;
+        let mut prev_pitch = None;
+        for note in self.notes.iter() {
+            let mut ascending = true;
+            if let Some(prev_pitch) = prev_pitch {
+                ascending = prev_pitch <= note.pitch;
+            }
+
+            let symbol = if ascending {
+                scale.ascending_note_weight(note.pitch)
+            } else {
+                scale.descending_note_weight(note.pitch)
+            };
+            result += note.duration * symbol.map_or(-1.0, |(_,w)| w);
+
+            if prev_pitch.is_none() || prev_pitch.unwrap() != note.pitch {
+                prev_pitch = Some(note.pitch);
+            }
+        }
+        result
     }
 
     pub fn total_note_weights(&self, scale: &RootedScale) -> HashHistogram<NoteName, f64> {
@@ -192,6 +222,7 @@ mod tests {
     use midi_note_recorder::Recording;
 
     use crate::analyzer::ChordProgression;
+    use crate::analyzer::Melody;
     use crate::notes::NoteName;
 
     use crate::notes::Accidental::Flat as F;
@@ -256,6 +287,21 @@ mod tests {
 
     #[test]
     fn test_melody_scales() {
-        todo!("Record a few melodies using different scales and see how it does!")
+        for (melody_file, root, acc, mode) in [
+            ("Aminor", NL::A, N, SM::Minor),
+            ("Blocrian", NL::B, N, SM::Locrian),
+            ("Cmajor", NL::C, N, SM::Major),
+            ("Ddorian", NL::D, N, SM::Dorian),
+            ("Ephrygian", NL::E, N, SM::Phrygian),
+            ("Flydian", NL::F, N, SM::Lydian),
+            ("Gmixolydian", NL::G, N, SM::Mixolydian),
+        ] {
+            let recording: Recording = Recording::from_file(melody_file).unwrap();
+            let melody = Melody::from(&recording);
+            let highest_scale = melody.highest_weight_scale();
+            let expected_name = NoteName::new(root, acc);
+            assert_eq!(highest_scale.mode(), mode);
+            assert_eq!(highest_scale.root_name(), expected_name);
+        }
     }
 }

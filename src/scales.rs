@@ -194,7 +194,9 @@ impl RootedScale {
         let scale_size = mode.scale_size();
         let characteristic_tones: Vec<usize> = mode.characteristic_notes();
         for (i, (_, note_name)) in result.notes2names_up.iter().take(scale_size).enumerate() {
-            let weight = if characteristic_tones.contains(&(i + 1)) {
+            let weight = if i == 0 {
+                4.0
+            } else if characteristic_tones.contains(&(i + 1)) {
                 2.0
             } else {
                 1.0
@@ -1021,12 +1023,5 @@ mod tests {
             assert_eq!(expected_pitch, diatonic_pitch);
             assert_eq!(expected_descend, descend);
         }
-    }
-
-    #[test]
-    fn exploring_find_favorite_notes() {
-        let rooted = SM::Major.rooted(NoteName::name_of(62));
-        let notes = rooted.all_diatonic_notes_up().take(15).collect::<Vec<_>>();
-        println!("{notes:?}");
     }
 }
