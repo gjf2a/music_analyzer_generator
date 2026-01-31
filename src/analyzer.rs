@@ -5,6 +5,7 @@ use midi_fundsp::note_velocity_from;
 
 use crate::{
     ChordName, NoteName, PitchSequence,
+    notes::Note,
     scales::{RootedScale, all_rooted_scales},
 };
 use midi_note_recorder::Recording;
@@ -114,13 +115,6 @@ impl From<&Recording> for ChordProgression {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
-pub struct Note {
-    pitch: u8,
-    velocity: u8,
-    duration: f64,
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct Melody {
     notes: Vec<Note>,
@@ -139,17 +133,13 @@ impl From<PitchSequence> for Melody {
         for (time, msg, _) in value.seq.iter() {
             if let Some(prev) = notes.last_mut() {
                 if let Some(start) = pending_start {
-                    prev.duration = *time - start;
+                    prev.set_duration(*time - start);
                     pending_start = None;
                 }
             }
             if let Some((pitch, velocity)) = note_velocity_from(msg) {
                 if velocity > 0 {
-                    notes.push(Note {
-                        pitch,
-                        velocity,
-                        duration: 0.0,
-                    });
+                    notes.push(Note::new(pitch, velocity));
                     pending_start = Some(*time);
                 }
             }
@@ -159,8 +149,15 @@ impl From<PitchSequence> for Melody {
 }
 
 impl Melody {
-    pub fn iter(&self) -> impl Iterator<Item=&Note> {
+    pub fn iter(&self) -> impl Iterator<Item = &Note> {
         self.notes.iter()
+    }
+
+    pub fn min_max_pitches(&self) -> (u8, u8) {
+        (
+            self.iter().map(|n| n.pitch()).min().unwrap(),
+            self.iter().map(|n| n.pitch()).max().unwrap(),
+        )
     }
 
     pub fn highest_weight_scale(&self) -> RootedScale {
@@ -177,18 +174,18 @@ impl Melody {
         for note in self.notes.iter() {
             let mut ascending = true;
             if let Some(prev_pitch) = prev_pitch {
-                ascending = prev_pitch <= note.pitch;
+                ascending = prev_pitch <= note.pitch();
             }
 
             let symbol = if ascending {
-                scale.ascending_note_weight(note.pitch)
+                scale.ascending_note_weight(note.pitch())
             } else {
-                scale.descending_note_weight(note.pitch)
+                scale.descending_note_weight(note.pitch())
             };
-            result += note.duration * symbol.map_or(-1.0, |(_, w)| w);
+            result += note.duration() * symbol.map_or(-1.0, |(_, w)| w);
 
-            if prev_pitch.is_none() || prev_pitch.unwrap() != note.pitch {
-                prev_pitch = Some(note.pitch);
+            if prev_pitch.is_none() || prev_pitch.unwrap() != note.pitch() {
+                prev_pitch = Some(note.pitch());
             }
         }
         result

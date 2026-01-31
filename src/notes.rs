@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use enum_iterator::Sequence;
+use midi_msg::MidiMsg;
 
 use crate::MAJOR_ROOT_IDS;
 
@@ -220,6 +221,43 @@ impl NoteName {
 impl Display for NoteName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}{}", self.ltr, self.acc.symbol(),)
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
+pub struct Note {
+    pitch: u8,
+    velocity: u8,
+    duration: f64,
+}
+
+impl Note {
+    pub fn new(pitch: u8, velocity: u8) -> Self {
+        Self {
+            pitch,
+            velocity,
+            duration: 0.0,
+        }
+    }
+
+    pub fn is_rest(&self) -> bool {
+        self.velocity == 0
+    }
+
+    pub fn pitch(&self) -> u8 {
+        self.pitch
+    }
+
+    pub fn velocity(&self) -> u8 {
+        self.velocity
+    }
+
+    pub fn duration(&self) -> f64 {
+        self.duration
+    }
+
+    pub fn set_duration(&mut self, new_duration: f64) {
+        self.duration = new_duration;
     }
 }
 
