@@ -38,7 +38,7 @@ impl ScaleMode {
     pub fn is_symmetric(&self) -> bool {
         match self {
             Self::Augmented | Self::Diminished | Self::WholeTone => true,
-            _ => false
+            _ => false,
         }
     }
 
@@ -303,7 +303,8 @@ impl RootedScale {
         } else {
             self
         };
-        mode.diatonic_steps_between(mode.middle_c(), mode.round_up(pitch)).unwrap()
+        mode.diatonic_steps_between_up(mode.middle_c(), mode.round_up(pitch))
+            .unwrap()
     }
 
     pub fn all_sharps(&self) -> impl Iterator<Item = NoteLetter> {
@@ -369,9 +370,9 @@ impl RootedScale {
         }
     }
 
-    pub fn diatonic_steps_between(&self, pitch_1: u8, pitch_2: u8) -> Option<u8> {
+    pub fn diatonic_steps_between_up(&self, pitch_1: u8, pitch_2: u8) -> Option<u8> {
         if pitch_1 > pitch_2 {
-            self.diatonic_steps_between(pitch_2, pitch_1)
+            self.diatonic_steps_between_up(pitch_2, pitch_1)
         } else {
             let interval = self
                 .notes_going_up()
@@ -385,6 +386,52 @@ impl RootedScale {
                 None
             } else {
                 Some((interval.len() - 1) as u8)
+            }
+        }
+    }
+
+    pub fn diatonic_steps_between(&self, lo_pitch: u8, hi_pitch: u8) -> Option<u8> {
+        self.notes_between_down(lo_pitch, hi_pitch)
+            .or(self.notes_between_up(lo_pitch, hi_pitch))
+            .map(|interval| (interval.len() - 1) as u8)
+    }
+
+    pub fn notes_between_down(&self, lo_pitch: u8, hi_pitch: u8) -> Option<Vec<u8>> {
+        if lo_pitch > hi_pitch {
+            self.notes_between_down(hi_pitch, lo_pitch)
+        } else {
+            let interval = self
+                .notes_going_down()
+                .skip_while(|n| *n > hi_pitch)
+                .take_while(|n| *n >= lo_pitch)
+                .collect::<Vec<_>>();
+            if interval.len() == 0
+                || interval[0] != hi_pitch
+                || interval[interval.len() - 1] != lo_pitch
+            {
+                None
+            } else {
+                Some(interval)
+            }
+        }
+    }
+
+    pub fn notes_between_up(&self, lo_pitch: u8, hi_pitch: u8) -> Option<Vec<u8>> {
+        if lo_pitch > hi_pitch {
+            self.notes_between_up(hi_pitch, lo_pitch)
+        } else {
+            let interval = self
+                .notes_going_up()
+                .skip_while(|n| *n < lo_pitch)
+                .take_while(|n| *n <= hi_pitch)
+                .collect::<Vec<_>>();
+            if interval.len() == 0
+                || interval[0] != lo_pitch
+                || interval[interval.len() - 1] != hi_pitch
+            {
+                None
+            } else {
+                Some(interval)
             }
         }
     }
@@ -598,6 +645,8 @@ mod tests {
             (71, SM::Augmented, 60, 79, None),
             (71, SM::Augmented, 61, 79, None),
             (71, SM::Augmented, 59, 79, Some(10)),
+            (60, SM::Major, 41, 79, Some(22)),
+            (69, SM::MelodicMinor, 41, 79, Some(22)),
         ] {
             let scale = mode.pitch_rooted(root);
             assert_eq!(scale.diatonic_steps_between(p1, p2), expected);
@@ -606,7 +655,11 @@ mod tests {
 
     #[test]
     fn test_round_up() {
-        for (root, mode, pitch, expected) in [(65, SM::Major, 71, 72), (65, SM::Major, 72, 72), (71, SM::Augmented, 79, 79)] {
+        for (root, mode, pitch, expected) in [
+            (65, SM::Major, 71, 72),
+            (65, SM::Major, 72, 72),
+            (71, SM::Augmented, 79, 79),
+        ] {
             let scale = mode.pitch_rooted(root);
             assert_eq!(scale.round_up(pitch), expected);
         }
@@ -1033,10 +1086,9 @@ mod tests {
 
     #[test]
     fn test_steps_to_middle_c() {
-        for (root_pitch, mode, test_pitch, target) in [
-            (60, SM::Major, 79, 11),
-            (59, SM::Augmented, 79, 11),
-        ] {
+        for (root_pitch, mode, test_pitch, target) in
+            [(60, SM::Major, 79, 11), (59, SM::Augmented, 79, 11)]
+        {
             let scale = mode.pitch_rooted(root_pitch);
             assert_eq!(scale.diatonic_steps_to_middle_c(test_pitch), target);
         }
