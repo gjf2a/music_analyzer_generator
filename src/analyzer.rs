@@ -189,15 +189,15 @@ impl Melody {
     }
 
     pub fn scale_score(&self, scale: &RootedScale) -> f64 {
-        let mut result = 0.0;
+        let mut total_weight = 0.0;
         for (note, direction) in self.iter_direction() {
             let symbol = match direction {
                 MelodyDirection::Ascending => scale.ascending_note_weight(note.pitch()),
                 MelodyDirection::Descending => scale.descending_note_weight(note.pitch()),
             };
-            result += note.duration() * symbol.map_or(-1.0, |(_, w)| w);
+            total_weight += note.duration() * symbol.map_or(-1.0, |(_, w)| w);
         }
-        result
+        total_weight
     }
 }
 
