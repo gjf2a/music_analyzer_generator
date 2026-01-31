@@ -181,7 +181,7 @@ impl Melody {
             } else {
                 scale.descending_note_weight(note.pitch)
             };
-            result += note.duration * symbol.map_or(-1.0, |(_,w)| w);
+            result += note.duration * symbol.map_or(-1.0, |(_, w)| w);
 
             if prev_pitch.is_none() || prev_pitch.unwrap() != note.pitch {
                 prev_pitch = Some(note.pitch);
