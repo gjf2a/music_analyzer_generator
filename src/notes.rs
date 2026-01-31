@@ -1,7 +1,6 @@
 use std::fmt::Display;
 
 use enum_iterator::Sequence;
-use midi_msg::MidiMsg;
 
 use crate::MAJOR_ROOT_IDS;
 

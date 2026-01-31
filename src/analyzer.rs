@@ -153,6 +153,10 @@ impl Melody {
         self.notes.iter()
     }
 
+    pub fn iter_with_prev(&self) -> PrevNoteIter<'_> {
+        PrevNoteIter { melody: self, i: 0 }
+    }
+
     pub fn duration(&self) -> f64 {
         self.iter().map(|n| n.duration()).sum()
     }
@@ -174,11 +178,14 @@ impl Melody {
 
     pub fn scale_score(&self, scale: &RootedScale) -> f64 {
         let mut result = 0.0;
-        let mut prev_pitch = None;
-        for note in self.notes.iter() {
-            let mut ascending = true;
-            if let Some(prev_pitch) = prev_pitch {
-                ascending = prev_pitch <= note.pitch();
+        let mut ascending = true;
+        for (prev_note, note) in self.iter_with_prev() {
+            if let Some(prev_note) = prev_note {
+                if prev_note.pitch() > note.pitch() {
+                    ascending = false;
+                } else if prev_note.pitch() < note.pitch() {
+                    ascending = true;
+                }
             }
 
             let symbol = if ascending {
@@ -187,11 +194,30 @@ impl Melody {
                 scale.descending_note_weight(note.pitch())
             };
             result += note.duration() * symbol.map_or(-1.0, |(_, w)| w);
-
-            if prev_pitch.is_none() || prev_pitch.unwrap() != note.pitch() {
-                prev_pitch = Some(note.pitch());
-            }
         }
+        result
+    }
+}
+
+pub struct PrevNoteIter<'a> {
+    melody: &'a Melody,
+    i: usize,
+}
+
+impl<'a> Iterator for PrevNoteIter<'a> {
+    type Item = (Option<Note>, Note);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = 
+        if self.i >= self.melody.notes.len() {
+            None
+        } else 
+        if self.i == 0 {
+            Some((None, self.melody.notes[0]))
+        } else {
+            Some((Some(self.melody.notes[self.i - 1]), self.melody.notes[self.i]))
+        };
+        self.i += 1;
         result
     }
 }
