@@ -303,7 +303,7 @@ impl RootedScale {
         } else {
             self
         };
-        mode.diatonic_steps_between_up(mode.middle_c(), mode.round_up(pitch))
+        mode.diatonic_steps_between(mode.middle_c(), mode.round_up(pitch))
             .unwrap()
     }
 
