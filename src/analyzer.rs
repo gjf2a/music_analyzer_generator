@@ -340,6 +340,7 @@ mod tests {
             ("Ephrygian", NL::E, N, SM::Phrygian),
             ("Flydian", NL::F, N, SM::Lydian),
             ("Gmixolydian", NL::G, N, SM::Mixolydian),
+            ("AMelodicMinor", NL::A, N, SM::MelodicMinor),
         ] {
             let recording: Recording = Recording::from_file(melody_file).unwrap();
             let melody = Melody::from(&recording);
