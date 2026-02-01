@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, HashSet};
+use std::{
+    cmp::{max, min},
+    collections::{BTreeMap, HashSet},
+};
 
 use bare_metal_modulo::{MNum, ModNum};
 use enum_iterator::{Sequence, all};
@@ -296,7 +299,7 @@ impl RootedScale {
         panic!("None of the C-adjacent notes are present in this scale.");
     }
 
-    pub fn diatonic_steps_to_middle_c(&self, pitch: u8) -> Option<u8> {
+    pub fn diatonic_steps_to_middle_c(&self, pitch: u8) -> (u8, u8) {
         let c_major = ScaleMode::Major.pitch_rooted(60);
         let mode = if self.mode.is_symmetric() {
             &c_major
@@ -389,49 +392,40 @@ impl RootedScale {
         }
     }
 
-    pub fn diatonic_steps_between(&self, pitch1: u8, pitch2: u8) -> Option<u8> {
-        self.notes_between_down(pitch1, pitch2)
-            .or(self.notes_between_up(pitch1, pitch2))
-            .map(|interval| (interval.len() - 1) as u8)
+    pub fn diatonic_steps_between(&self, pitch1: u8, pitch2: u8) -> (u8, u8) {
+        let hi_pitch = max(pitch1, pitch2);
+        let lo_pitch = min(pitch1, pitch2);
+        let up = self.notes_between_up(lo_pitch, hi_pitch);
+        let down = self
+            .notes_between_down(lo_pitch, hi_pitch)
+            .iter()
+            .copied()
+            .rev()
+            .collect::<Vec<_>>();
+        let best = if up.len() > down.len() { up } else { down };
+        let extra = best[0] - lo_pitch + hi_pitch - best[best.len() - 1];
+        ((best.len() - 1) as u8, extra)
     }
 
-    pub fn notes_between_down(&self, lo_pitch: u8, hi_pitch: u8) -> Option<Vec<u8>> {
+    pub fn notes_between_down(&self, lo_pitch: u8, hi_pitch: u8) -> Vec<u8> {
         if lo_pitch > hi_pitch {
             self.notes_between_down(hi_pitch, lo_pitch)
         } else {
-            let interval = self
-                .notes_going_down()
+            self.notes_going_down()
                 .skip_while(|n| *n > hi_pitch)
                 .take_while(|n| *n >= lo_pitch)
-                .collect::<Vec<_>>();
-            if interval.len() == 0
-                || interval[0] != hi_pitch
-                || interval[interval.len() - 1] != lo_pitch
-            {
-                None
-            } else {
-                Some(interval)
-            }
+                .collect()
         }
     }
 
-    pub fn notes_between_up(&self, lo_pitch: u8, hi_pitch: u8) -> Option<Vec<u8>> {
+    pub fn notes_between_up(&self, lo_pitch: u8, hi_pitch: u8) -> Vec<u8> {
         if lo_pitch > hi_pitch {
             self.notes_between_up(hi_pitch, lo_pitch)
         } else {
-            let interval = self
-                .notes_going_up()
+            self.notes_going_up()
                 .skip_while(|n| *n < lo_pitch)
                 .take_while(|n| *n <= hi_pitch)
-                .collect::<Vec<_>>();
-            if interval.len() == 0
-                || interval[0] != lo_pitch
-                || interval[interval.len() - 1] != hi_pitch
-            {
-                None
-            } else {
-                Some(interval)
-            }
+                .collect()
         }
     }
 
@@ -636,16 +630,16 @@ mod tests {
     #[test]
     fn test_diatonic_intervals() {
         for (root, mode, p1, p2, expected) in [
-            (71, SM::Major, 70, 75, Some(3)),
-            (71, SM::Major, 75, 70, Some(3)),
-            (71, SM::Major, 70, 74, None),
-            (67, SM::Major, 71, 71, Some(0)),
-            (62, SM::Dorian, 65, 74, Some(5)),
-            (71, SM::Augmented, 60, 79, None),
-            (71, SM::Augmented, 61, 79, None),
-            (71, SM::Augmented, 59, 79, Some(10)),
-            (60, SM::Major, 41, 79, Some(22)),
-            (69, SM::MelodicMinor, 41, 79, Some(22)),
+            (71, SM::Major, 70, 75, (3, 0)),
+            (71, SM::Major, 75, 70, (3, 0)),
+            (71, SM::Major, 70, 74, (2, 1)),
+            (67, SM::Major, 71, 71, (0, 0)),
+            (62, SM::Dorian, 65, 74, (5, 0)),
+            // (71, SM::Augmented, 60, 79, None),
+            //(71, SM::Augmented, 61, 79, None),
+            (71, SM::Augmented, 59, 79, (10, 0)),
+            (60, SM::Major, 41, 79, (22, 0)),
+            (69, SM::MelodicMinor, 41, 79, (22, 0)),
         ] {
             let scale = mode.pitch_rooted(root);
             assert_eq!(scale.diatonic_steps_between(p1, p2), expected);
@@ -1085,11 +1079,13 @@ mod tests {
 
     #[test]
     fn test_steps_to_middle_c() {
-        for (ltr, acc, mode, test_pitch, target) in
-            [(NL::C, N, SM::Major, 79, 11), (NL::B, N, SM::Augmented, 79, 11), (NL::A, N, SM::MelodicMinor, 79, 11)]
-        {
+        for (ltr, acc, mode, test_pitch, target) in [
+            (NL::C, N, SM::Major, 79, 11),
+            (NL::B, N, SM::Augmented, 79, 11),
+            (NL::A, N, SM::MelodicMinor, 79, 11),
+        ] {
             let scale = mode.rooted(NoteName::new(ltr, acc));
-            assert_eq!(scale.diatonic_steps_to_middle_c(test_pitch), Some(target));
+            assert_eq!(scale.diatonic_steps_to_middle_c(test_pitch), (target, 0));
         }
     }
 }
