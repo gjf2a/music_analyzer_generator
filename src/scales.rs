@@ -296,7 +296,7 @@ impl RootedScale {
         panic!("None of the C-adjacent notes are present in this scale.");
     }
 
-    pub fn diatonic_steps_to_middle_c(&self, pitch: u8) -> u8 {
+    pub fn diatonic_steps_to_middle_c(&self, pitch: u8) -> Option<u8> {
         let c_major = ScaleMode::Major.pitch_rooted(60);
         let mode = if self.mode.is_symmetric() {
             &c_major
@@ -304,7 +304,6 @@ impl RootedScale {
             self
         };
         mode.diatonic_steps_between(mode.middle_c(), mode.round_up(pitch))
-            .unwrap()
     }
 
     pub fn all_sharps(&self) -> impl Iterator<Item = NoteLetter> {
@@ -1086,11 +1085,11 @@ mod tests {
 
     #[test]
     fn test_steps_to_middle_c() {
-        for (root_pitch, mode, test_pitch, target) in
-            [(60, SM::Major, 79, 11), (59, SM::Augmented, 79, 11)]
+        for (ltr, acc, mode, test_pitch, target) in
+            [(NL::C, N, SM::Major, 79, 11), (NL::B, N, SM::Augmented, 79, 11), (NL::A, N, SM::MelodicMinor, 79, 11)]
         {
-            let scale = mode.pitch_rooted(root_pitch);
-            assert_eq!(scale.diatonic_steps_to_middle_c(test_pitch), target);
+            let scale = mode.rooted(NoteName::new(ltr, acc));
+            assert_eq!(scale.diatonic_steps_to_middle_c(test_pitch), Some(target));
         }
     }
 }
