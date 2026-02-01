@@ -389,9 +389,9 @@ impl RootedScale {
         }
     }
 
-    pub fn diatonic_steps_between(&self, lo_pitch: u8, hi_pitch: u8) -> Option<u8> {
-        self.notes_between_down(lo_pitch, hi_pitch)
-            .or(self.notes_between_up(lo_pitch, hi_pitch))
+    pub fn diatonic_steps_between(&self, pitch1: u8, pitch2: u8) -> Option<u8> {
+        self.notes_between_down(pitch1, pitch2)
+            .or(self.notes_between_up(pitch1, pitch2))
             .map(|interval| (interval.len() - 1) as u8)
     }
 
