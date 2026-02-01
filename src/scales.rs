@@ -214,7 +214,7 @@ impl RootedScale {
             };
             result.note_weights_up.bump_by(note_name, weight);
         }
-        result.note_weights_up.normalize();
+        result.note_weights_up.normalize(1.0);
 
         for (i, (_, note_name)) in result.notes2names_down.iter().take(scale_size).enumerate() {
             let tone_index = if i == 0 { 1 } else { scale_size + 2 - i };
@@ -225,7 +225,7 @@ impl RootedScale {
             };
             result.note_weights_down.bump_by(note_name, weight);
         }
-        result.note_weights_down.normalize();
+        result.note_weights_down.normalize(1.0);
         result
     }
 
