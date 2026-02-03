@@ -197,6 +197,10 @@ impl NoteName {
         }
     }
 
+    pub fn with_acc(&self, acc: Accidental) -> Self {
+        Self::new(self.ltr, acc)
+    }
+ 
     pub fn modified(&self, modifier: Accidental) -> Option<Self> {
         (self.acc + modifier).map(|acc| Self { ltr: self.ltr, acc })
     }
@@ -368,6 +372,20 @@ mod tests {
             let start = NoteName::new(ltr, acc);
             let target = NoteName::new(ltr, target);
             assert_eq!(start.modified(modifier).unwrap(), target);
+        }
+    }
+
+    #[test]
+    fn test_with_acc() {
+        for (ltr, acc, modifier, target) in [
+            (NL::A, N, S, S),
+            (NL::F, S, S, S),
+            (NL::B, F, S, S),
+            (NL::B, F, N, N),
+        ] {
+            let start = NoteName::new(ltr, acc);
+            let target = NoteName::new(ltr, target);
+            assert_eq!(start.with_acc(modifier), target);
         }
     }
 }
