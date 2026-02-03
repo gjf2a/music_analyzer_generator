@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, ops::Add};
 
 use enum_iterator::Sequence;
 
@@ -137,6 +137,31 @@ impl Accidental {
     }
 }
 
+impl TryFrom<i16> for Accidental {
+    type Error = anyhow::Error;
+
+    fn try_from(value: i16) -> Result<Self, Self::Error> {
+        match value {
+            -2 => Ok(Self::DoubleFlat),
+            -1 => Ok(Self::Flat),
+            0 => Ok(Self::Natural),
+            1 => Ok(Self::Sharp),
+            2 => Ok(Self::DoubleSharp),
+            _ => Err(anyhow::anyhow!(
+                "{value} cannot be converted to an Accidental"
+            )),
+        }
+    }
+}
+
+impl Add for Accidental {
+    type Output = Option<Self>;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self::try_from(self.offset_value() + rhs.offset_value()).ok()
+    }
+}
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct NoteName {
     ltr: NoteLetter,
@@ -170,6 +195,10 @@ impl NoteName {
         } else {
             panic!("Can't sharpen {:?}", self.acc);
         }
+    }
+
+    pub fn modified(&self, modifier: Accidental) -> Option<Self> {
+        (self.acc + modifier).map(|acc| Self { ltr: self.ltr, acc })
     }
 
     pub fn name_of(pitch: u8) -> Self {
@@ -262,6 +291,8 @@ impl Note {
 
 #[cfg(test)]
 mod tests {
+    use crate::notes::Accidental::DoubleFlat as DF;
+    use crate::notes::Accidental::DoubleSharp as DS;
     use crate::notes::Accidental::Flat as F;
     use crate::notes::Accidental::Natural as N;
     use crate::notes::Accidental::Sharp as S;
@@ -304,6 +335,39 @@ mod tests {
         ] {
             let name = NoteName::new(ltr, acc);
             assert_eq!(name.is_pitch_match(candidate), is_match);
+        }
+    }
+
+    #[test]
+    fn test_add_accidental() {
+        for (a, b, c) in [
+            (N, S, Some(S)),
+            (S, F, Some(N)),
+            (F, S, Some(N)),
+            (F, N, Some(F)),
+            (F, F, Some(DF)),
+            (S, S, Some(DS)),
+            (DS, F, Some(S)),
+            (DF, F, None),
+            (DS, S, None),
+            (DS, DS, None),
+            (DS, DF, Some(N)),
+        ] {
+            assert_eq!(a + b, c);
+        }
+    }
+
+    #[test]
+    fn test_modified_note_name() {
+        for (ltr, acc, modifier, target) in [
+            (NL::A, N, S, S),
+            (NL::F, S, S, DS),
+            (NL::B, F, S, N),
+            (NL::B, F, N, F),
+        ] {
+            let start = NoteName::new(ltr, acc);
+            let target = NoteName::new(ltr, target);
+            assert_eq!(start.modified(modifier).unwrap(), target);
         }
     }
 }

@@ -11,6 +11,7 @@ rand = "0.9.2"
 midi_fundsp = "0.7.1"
 bare_metal_modulo = "1.2.5"
 hash_histogram = "0.13.0"
+anyhow = "1.0.100"
 
 [dev-dependencies]
 anyhow = "1.0.100"
