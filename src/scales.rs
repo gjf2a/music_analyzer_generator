@@ -7,7 +7,7 @@ use bare_metal_modulo::{MNum, ModNum};
 use enum_iterator::{Sequence, all};
 use hash_histogram::HashHistogram;
 
-use crate::notes::{Accidental, NoteLetter, NoteName};
+use crate::{analyzer::MelodyDirection, notes::{Accidental, NoteLetter, NoteName}};
 
 pub fn all_rooted_scales() -> impl Iterator<Item = RootedScale> {
     all::<ScaleMode>().flat_map(|mode| (60..72).map(move |p| mode.pitch_rooted(p)))
@@ -426,6 +426,13 @@ impl RootedScale {
                 .skip_while(|n| *n < lo_pitch)
                 .take_while(|n| *n <= hi_pitch)
                 .collect()
+        }
+    }
+
+    pub fn matching_pitch(&self, pitch: u8, direction: MelodyDirection) -> (NoteName, u8, Option<Accidental>) {
+        match direction {
+            MelodyDirection::Ascending => self.ascending_match(pitch),
+            MelodyDirection::Descending => self.descending_match(pitch),
         }
     }
 
