@@ -564,7 +564,6 @@ impl ScalePattern {
 mod tests {
     use std::collections::VecDeque;
 
-    use crate::analyzer::MelodyDirection;
     use crate::{MAJOR_ROOT_IDS, MINOR_ROOT_IDS, NoteName};
 
     use crate::notes::Accidental::Flat as F;
