@@ -2,6 +2,7 @@ pub mod analyzer;
 pub mod chords;
 pub mod notes;
 pub mod scales;
+pub mod figures;
 
 use std::collections::VecDeque;
 
