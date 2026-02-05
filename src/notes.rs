@@ -200,7 +200,7 @@ impl NoteName {
     pub fn with_acc(&self, acc: Accidental) -> Self {
         Self::new(self.ltr, acc)
     }
- 
+
     pub fn modified(&self, modifier: Accidental) -> Option<Self> {
         (self.acc + modifier).map(|acc| Self { ltr: self.ltr, acc })
     }

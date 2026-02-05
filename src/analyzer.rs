@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::HashMap};
+use std::{cmp::Ordering, collections::HashMap, ops::Index};
 
 use hash_histogram::HashHistogram;
 use midi_fundsp::note_velocity_from;
@@ -149,8 +149,21 @@ impl From<PitchSequence> for Melody {
 }
 
 impl Melody {
+    pub fn from_file(filename: &str) -> anyhow::Result<Self> {
+        let r = Recording::from_file(filename)?;
+        Ok(Self::from(&r))
+    }
+
     pub fn len(&self) -> usize {
         self.notes.len()
+    }
+
+    pub fn starts_notes_lens(&'_ self) -> ConsolidatedIter<'_> {
+        ConsolidatedIter {
+            start: 0,
+            len: 1,
+            melody: self,
+        }
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &Note> {
@@ -206,6 +219,67 @@ impl Melody {
             total_weight += note.duration() * symbol.map_or(-1.0, |(_, w)| w);
         }
         total_weight
+    }
+
+    pub fn without_ghosts(&self, longest_ghost: f64) -> Self {
+        let mut notes = vec![];
+        let mut ghostliness = 0.0;
+        for n in self.iter() {
+            if n.duration() > longest_ghost {
+                let mut n = *n;
+                if ghostliness > 0.0 {
+                    n.set_duration(n.duration() + ghostliness);
+                    ghostliness = 0.0;
+                }
+                notes.push(n);
+            } else {
+                ghostliness += n.duration();
+            }
+        }
+        Self { notes }
+    }
+}
+
+pub struct ConsolidatedIter<'a> {
+    start: usize,
+    len: usize,
+    melody: &'a Melody,
+}
+
+impl<'a> ConsolidatedIter<'a> {
+    fn pitch(&self) -> u8 {
+        self.melody[self.start].pitch()
+    }
+
+    fn end(&self) -> usize {
+        self.start + self.len
+    }
+}
+
+impl<'a> Iterator for ConsolidatedIter<'a> {
+    type Item = (usize, u8, usize);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.start < self.melody.len() {
+            while self.end() < self.melody.len() && self.melody[self.end()].pitch() == self.pitch()
+            {
+                self.len += 1;
+            }
+            let result = (self.start, self.pitch(), self.len);
+            self.start += self.len;
+            self.len = 1;
+            Some(result)
+        } else {
+            None
+        }
+    }
+}
+
+impl Index<usize> for Melody {
+    type Output = Note;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.notes[index]
     }
 }
 
@@ -323,8 +397,7 @@ mod tests {
             ("Flydian", 8),
             ("Gmixolydian", 8),
         ] {
-            let recording: Recording = Recording::from_file(melody_file).unwrap();
-            let melody = Melody::from(&recording);
+            let melody = Melody::from_file(melody_file).unwrap();
             println!("{melody_file}");
             assert_eq!(melody.len(), target);
         }
@@ -342,12 +415,91 @@ mod tests {
             ("Gmixolydian", NL::G, N, SM::Mixolydian),
             ("AMelodicMinor", NL::A, N, SM::MelodicMinor),
         ] {
-            let recording: Recording = Recording::from_file(melody_file).unwrap();
-            let melody = Melody::from(&recording);
+            let melody = Melody::from_file(melody_file).unwrap();
             let highest_scale = melody.highest_weight_scale();
             let expected_name = NoteName::new(root, acc);
             assert_eq!(highest_scale.mode(), mode);
             assert_eq!(highest_scale.root_name(), expected_name);
+        }
+    }
+
+    #[test]
+    fn test_consolidated() {
+        let melody = Melody::from_file("joy_world_2").unwrap();
+        let expected_consolidated = vec![
+            (0, 79, 1),
+            (1, 78, 1),
+            (2, 76, 1),
+            (3, 74, 1),
+            (4, 73, 1),
+            (5, 72, 1),
+            (6, 71, 1),
+            (7, 69, 1),
+            (8, 81, 1),
+            (9, 69, 1),
+            (10, 67, 1),
+            (11, 66, 1),
+            (12, 74, 1),
+            (13, 76, 2),
+            (15, 78, 2),
+            (17, 79, 1),
+            (18, 78, 1),
+            (19, 80, 1),
+            (20, 79, 2),
+            (22, 78, 1),
+            (23, 76, 1),
+            (24, 74, 2),
+            (26, 72, 2),
+            (28, 71, 1),
+            (29, 79, 3),
+            (32, 78, 1),
+            (33, 76, 1),
+            (34, 75, 1),
+            (35, 74, 1),
+            (36, 75, 1),
+            (37, 74, 1),
+            (38, 72, 1),
+            (39, 71, 1),
+            (40, 83, 1),
+            (41, 71, 6),
+            (47, 72, 2),
+            (49, 74, 1),
+            (50, 73, 1),
+            (51, 72, 2),
+            (53, 71, 1),
+            (54, 70, 1),
+            (55, 69, 3),
+            (58, 71, 2),
+            (60, 72, 2),
+            (62, 71, 2),
+            (64, 67, 1),
+            (65, 80, 1),
+            (66, 79, 1),
+            (67, 76, 1),
+            (68, 74, 1),
+            (69, 72, 1),
+            (70, 71, 1),
+            (71, 72, 1),
+            (72, 71, 1),
+            (73, 69, 1),
+            (74, 67, 1),
+        ];
+        let consolidated = melody.starts_notes_lens().collect::<Vec<_>>();
+        assert_eq!(consolidated, expected_consolidated);
+    }
+
+    #[test]
+    fn view_melody() {
+        let melody = Melody::from_file("joy_world_2")
+            .unwrap()
+            .without_ghosts(0.05);
+        let notes = melody
+            .iter()
+            .enumerate()
+            .map(|(i, n)| (i, n.pitch(), n.duration()))
+            .collect::<Vec<_>>();
+        for (i, n, d) in notes {
+            println!("{i}: {n} {d:.3}");
         }
     }
 }
