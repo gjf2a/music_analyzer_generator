@@ -1,4 +1,4 @@
-use std::{cmp::min, collections::BTreeSet, fmt::Display};
+use std::{collections::BTreeSet, fmt::Display};
 
 use enum_iterator::{Sequence, all};
 
@@ -53,33 +53,36 @@ impl MelodicFigure {
         let scale = melody.highest_weight_scale();
         let consolidated = melody.starts_notes_lens().collect::<Vec<_>>();
         for (ci, (mi, _, _)) in consolidated.iter().copied().enumerate() {
-            let mut figures = BTreeSet::new();
-            for figure in all::<Self>() {
-                let pattern = figure.pattern();
-                let back_up_start = if ci <= pattern.len() {
-                    0
-                } else {
-                    ci - pattern.len()
-                };
-                let go_forward_end = min(ci + pattern.len(), consolidated.len());
-                for j in back_up_start..go_forward_end {
-                    if Self::pattern_aligned_at(j, &pattern, &scale, &consolidated) {
-                        figures.insert(figure);
-                    }
-                }
-            }
-            result.push((mi, figures));
+            result.push((mi, Self::matching_figures_at(ci, &scale, &consolidated)));
         }
         result
     }
 
+    fn matching_figures_at(ci: usize, scale: &RootedScale, consolidated: &Vec<(usize, u8, usize)>) -> BTreeSet<MelodicFigure> {
+        let mut figures = BTreeSet::new();
+        for figure in all::<Self>() {
+            let pattern = figure.pattern();
+            let back_up_start = if ci <= pattern.len() {
+                0
+            } else {
+                ci - pattern.len()
+            };
+            for pattern_start in back_up_start..=ci {
+                if Self::pattern_aligned_at(pattern_start, &pattern, &scale, &consolidated) {
+                    figures.insert(figure);
+                }
+            }
+        }
+        figures
+    }
+
     fn pattern_aligned_at(
-        j: usize,
+        pattern_start: usize,
         pattern: &Vec<i16>,
         scale: &RootedScale,
         consolidated: &Vec<(usize, u8, usize)>,
     ) -> bool {
-        let mut pattern_notes = vec![consolidated[j].1];
+        let mut pattern_notes = vec![consolidated[pattern_start].1];
         for diatonic_steps in pattern.iter() {
             let current = pattern_notes[pattern_notes.len() - 1];
             if *diatonic_steps > 0 {
@@ -97,7 +100,7 @@ impl MelodicFigure {
             }
         }
         (0..pattern_notes.len())
-            .all(|k| k + j >= consolidated.len() || consolidated[k + j].1 == pattern_notes[k])
+            .all(|k| k + pattern_start >= consolidated.len() || consolidated[k + pattern_start].1 == pattern_notes[k])
     }
 
     pub fn pattern(&self) -> Vec<i16> {
@@ -235,5 +238,16 @@ mod tests {
             let figstr = figs.iter().map(|f| format!("{f} ")).collect::<String>();
             println!("{i}: {} {figstr}\n", melody[i].pitch());
         }
+    }
+
+    #[test]
+    fn test_matching_figure_bug() {
+        let melody = Melody::from_file("joy_world_2")
+            .unwrap()
+            .without_ghosts(0.05);
+        let scale = melody.highest_weight_scale();
+        let consolidated = melody.starts_notes_lens().collect();
+        let aligned = MelodicFigure::matching_figures_at(6, &scale, &consolidated);
+        println!("{aligned:?}");
     }
 }
