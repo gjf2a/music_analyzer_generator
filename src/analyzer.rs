@@ -10,6 +10,9 @@ use crate::{
 };
 use midi_note_recorder::Recording;
 
+pub const PHRASE_ENDING_DURATION_MULTIPLIER: f64 = 1.5;
+pub const DURATION_MOVING_WINDOW_SIZE: usize = 4;
+
 #[derive(Debug)]
 pub struct ChordProgression {
     chords_starts: Vec<(ChordName, f64)>,
@@ -237,6 +240,26 @@ impl Melody {
             }
         }
         Self { notes }
+    }
+
+    pub fn mean_preceding_duration(&self, i: usize) -> Option<f64> {
+        if i < DURATION_MOVING_WINDOW_SIZE || i >= self.len() {
+            None
+        } else {
+            Some(
+                ((i - DURATION_MOVING_WINDOW_SIZE)..i)
+                    .map(|n| self[n].duration())
+                    .sum::<f64>()
+                    / DURATION_MOVING_WINDOW_SIZE as f64,
+            )
+        }
+    }
+
+    pub fn phrase_ends_at(&self, i: usize) -> bool {
+        i + 1 == self.len()
+            || self.mean_preceding_duration(i).map_or(false, |m| {
+                self[i].duration() > PHRASE_ENDING_DURATION_MULTIPLIER * m
+            })
     }
 }
 
@@ -498,8 +521,9 @@ mod tests {
             .enumerate()
             .map(|(i, n)| (i, n.pitch(), n.duration()))
             .collect::<Vec<_>>();
-        for (i, n, d) in notes {
-            println!("{i}: {n} {d:.3}");
+        for (i, n, d) in notes.iter() {
+            let phrase_end = if melody.phrase_ends_at(*i) { "*" } else { "" };
+            println!("{i}: {n} {d:.3}{phrase_end}");
         }
     }
 }

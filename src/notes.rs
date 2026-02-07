@@ -4,6 +4,10 @@ use enum_iterator::Sequence;
 
 use crate::MAJOR_ROOT_IDS;
 
+pub fn same_octave(p1: u8, p2: u8) -> bool {
+    p1 % 12 == p2 % 12
+}
+
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Sequence, Hash)]
 pub enum NoteLetter {
     C,

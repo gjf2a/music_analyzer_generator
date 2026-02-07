@@ -2,7 +2,7 @@ use std::{collections::BTreeSet, fmt::Display};
 
 use enum_iterator::{Sequence, all};
 
-use crate::{analyzer::Melody, scales::RootedScale};
+use crate::{analyzer::Melody, notes::same_octave, scales::RootedScale};
 
 // Inspired by: https://figuringoutmelody.com/the-24-universal-melodic-figures/
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Sequence, Hash, Ord, PartialOrd)]
@@ -48,67 +48,6 @@ impl Display for MelodicFigure {
 //
 
 impl MelodicFigure {
-    pub fn matching_figures(melody: &Melody) -> Vec<(usize, BTreeSet<Self>)> {
-        let mut result = vec![];
-        let scale = melody.highest_weight_scale();
-        let consolidated = melody.starts_notes_lens().collect::<Vec<_>>();
-        for (ci, (mi, _, _)) in consolidated.iter().copied().enumerate() {
-            result.push((mi, Self::matching_figures_at(ci, &scale, &consolidated)));
-        }
-        result
-    }
-
-    fn matching_figures_at(
-        ci: usize,
-        scale: &RootedScale,
-        consolidated: &Vec<(usize, u8, usize)>,
-    ) -> BTreeSet<MelodicFigure> {
-        let mut figures = BTreeSet::new();
-        for figure in all::<Self>() {
-            let pattern = figure.pattern();
-            let back_up_start = if ci <= pattern.len() {
-                0
-            } else {
-                ci - pattern.len()
-            };
-            for pattern_start in back_up_start..=ci {
-                if Self::pattern_aligned_at(pattern_start, &pattern, &scale, &consolidated) {
-                    figures.insert(figure);
-                }
-            }
-        }
-        figures
-    }
-
-    fn pattern_aligned_at(
-        pattern_start: usize,
-        pattern: &Vec<i16>,
-        scale: &RootedScale,
-        consolidated: &Vec<(usize, u8, usize)>,
-    ) -> bool {
-        let mut pattern_notes = vec![consolidated[pattern_start].1];
-        for diatonic_steps in pattern.iter() {
-            let current = pattern_notes[pattern_notes.len() - 1];
-            if *diatonic_steps > 0 {
-                pattern_notes.push(
-                    scale
-                        .note_up(current, *diatonic_steps as usize + 1)
-                        .unwrap(),
-                );
-            } else {
-                pattern_notes.push(
-                    scale
-                        .note_down(current, -(*diatonic_steps) as usize + 1)
-                        .unwrap(),
-                );
-            }
-        }
-        (0..pattern_notes.len()).all(|k| {
-            k + pattern_start >= consolidated.len()
-                || consolidated[k + pattern_start].1 == pattern_notes[k]
-        })
-    }
-
     pub fn pattern(&self) -> Vec<i16> {
         let mut result = self.shape.pattern();
         if self.polarity == FigurePolarity::Negative {
@@ -221,11 +160,164 @@ pub enum FigureDirection {
     Reverse,
 }
 
+pub fn figures2string<'a, I: Iterator<Item = &'a MelodicFigure>>(figs: I) -> String {
+    figs.map(|f| format!("{f} ")).collect()
+}
+
+pub struct FigureMatcher<'a> {
+    melody: &'a Melody,
+    scale: RootedScale,
+    consolidated: Vec<(usize, u8, usize)>,
+    start_table: Vec<(usize, BTreeSet<MelodicFigure>)>,
+    end_table: Vec<(usize, BTreeSet<MelodicFigure>)>,
+    within_table: Vec<(usize, BTreeSet<MelodicFigure>)>,
+}
+
+impl<'a> FigureMatcher<'a> {
+    pub fn show_tables_for(melody: &'a Melody) {
+        let matcher = Self::new(melody);
+        for i in 0..matcher.consolidated.len() {
+            println!(
+                "{i} ({}): start: {} within: {} end: {}",
+                matcher.consolidated[i].0,
+                figures2string(matcher.start_table[i].1.iter()),
+                figures2string(matcher.within_table[i].1.iter()),
+                figures2string(matcher.end_table[i].1.iter()),
+            );
+        }
+    }
+
+    fn new(melody: &'a Melody) -> Self {
+        let mut matcher = Self {
+            melody,
+            scale: melody.highest_weight_scale(),
+            consolidated: melody.starts_notes_lens().collect(),
+            start_table: vec![],
+            end_table: vec![],
+            within_table: vec![],
+        };
+        matcher.start_table = matcher.figure_table(Self::starts_at);
+        matcher.end_table = matcher.figure_table(Self::ends_at);
+        matcher.within_table = matcher.figure_table(Self::within);
+        matcher
+    }
+
+    pub fn matching_figures(melody: &'a Melody) -> Vec<(usize, BTreeSet<MelodicFigure>)> {
+        let matcher = Self::new(melody);
+        let mut result = vec![];
+        for (ci, (mi, _, _)) in matcher.consolidated.iter().copied().enumerate() {
+            result.push((mi, matcher.matching_figures_at(ci)));
+        }
+        result
+    }
+
+    fn figure_table<M: Fn(&Self, usize, MelodicFigure) -> bool>(
+        &self,
+        matcher: M,
+    ) -> Vec<(usize, BTreeSet<MelodicFigure>)> {
+        (0..self.consolidated.len())
+            .map(|i| {
+                (
+                    i,
+                    all::<MelodicFigure>()
+                        .filter(|fig| matcher(self, i, *fig))
+                        .collect(),
+                )
+            })
+            .collect()
+    }
+
+    fn ends_at(&self, i: usize, fig: MelodicFigure) -> bool {
+        let pattern = fig.pattern();
+        if i < pattern.len() {
+            false
+        } else {
+            self.pattern_aligned_at(i - pattern.len(), &pattern)
+        }
+    }
+
+    fn starts_at(&self, i: usize, fig: MelodicFigure) -> bool {
+        let pattern = fig.pattern();
+        self.pattern_aligned_at(i, &pattern)
+    }
+
+    fn within(&self, i: usize, fig: MelodicFigure) -> bool {
+        let pattern = fig.pattern();
+        (2..=pattern.len()).map(|len| len - 1).any(|offset| {
+            pattern.len() > offset && i >= offset && self.pattern_aligned_at(i - offset, &pattern)
+        })
+    }
+
+    fn pattern_aligned_at(&self, pattern_start: usize, pattern: &Vec<i16>) -> bool {
+        if pattern_start + pattern.len() >= self.consolidated.len() {
+            return false;
+        }
+        let mut pattern_notes = vec![self.consolidated[pattern_start].1];
+        for diatonic_steps in pattern.iter() {
+            let current = pattern_notes[pattern_notes.len() - 1];
+            if *diatonic_steps > 0 {
+                pattern_notes.push(
+                    self.scale
+                        .note_up(current, *diatonic_steps as usize + 1)
+                        .unwrap(),
+                );
+            } else {
+                pattern_notes.push(
+                    self.scale
+                        .note_down(current, -(*diatonic_steps) as usize + 1)
+                        .unwrap(),
+                );
+            }
+        }
+        (0..pattern_notes.len()).all(|k| {
+            k + pattern_start >= self.consolidated.len()
+                || self.consolidated[k + pattern_start].1 == pattern_notes[k]
+        })
+    }
+
+    fn matching_figures_at(&self, ci: usize) -> BTreeSet<MelodicFigure> {
+        all::<MelodicFigure>()
+            .filter(|fig| self.any_property(ci, fig))
+            .collect()
+    }
+
+    fn any_property(&self, ci: usize, fig: &MelodicFigure) -> bool {
+        self.start_property(ci, fig)
+                    || self.within_property(ci, fig)
+                    || self.end_property(ci, fig)
+    }
+
+    fn within_property(&self, ci: usize, fig: &MelodicFigure) -> bool {
+        self.within_table[ci].1.contains(fig)
+    }
+
+    fn end_property(&self, ci: usize, fig: &MelodicFigure) -> bool {
+        self.end_table[ci].1.contains(fig)
+            && (self.start_table[ci].1.len() > 0
+                || self.within_table[ci].1.len() > 0
+                || ci + 1 == self.consolidated.len()
+                || same_octave(self.consolidated[ci].1, self.consolidated[ci + 1].1)
+                || self.melody.phrase_ends_at(self.consolidated[ci].0))
+    }
+
+    fn start_property(&self, ci: usize, fig: &MelodicFigure) -> bool {
+        self.start_table[ci].1.contains(fig)
+            && (self.end_table[ci].1.len() > 0
+                || self.within_table[ci].1.len() > 0
+                || ci == 0
+                || same_octave(self.consolidated[ci - 1].1, self.consolidated[ci].1)
+                || self.melody.phrase_ends_at(self.consolidated[ci - 1].0))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use enum_iterator::all;
 
-    use crate::{analyzer::Melody, figures::MelodicFigure};
+    use crate::{
+        analyzer::Melody,
+        figures::{FigureMatcher, MelodicFigure},
+    };
 
     #[test]
     fn see_sequence() {
@@ -239,63 +331,207 @@ mod tests {
         let melody = Melody::from_file("joy_world_2")
             .unwrap()
             .without_ghosts(0.05);
-        let figures = MelodicFigure::matching_figures(&melody);
-        let expected = [(
-            0,
-            79,
-            vec!["Note3Scale>-", "Note3Scale<-", "Run>-", "Run<-"],
-        ),
-        (
-            1,
-            78,
-            vec!["Note3Scale>-", "Note3Scale<-", "Run>-", "Run<-"],
-        ),
-        (
-            2,
-            76,
-            vec!["Note3Scale>-", "Note3Scale<-", "Run>-", "Run<-"],
-        ),
-        (
-            3,
-            74,
-            vec!["Note3Scale>-", "Note3Scale<-", "Run>-", "Run<-"],
-        ),
-        (
-            4,
-            72,
-            vec!["Note3Scale>-", "Note3Scale<-", "Run>-", "Run<-"],
-        ),
-        (
-            5,
-            71,
-            vec!["Note3Scale>-", "Note3Scale<-", "Run>-", "Run<-"],
-        ),
-        (
-            6,
-            69,
-            vec!["Note3Scale>-", "Note3Scale<-", "Run>-", "Run<-"],
-        ),
-        (
-            7,
-            67,
-            vec!["Note3Scale>-", "Note3Scale<-", "Run>-", "Run<-", "Vault4>+"],
-        ),
-        (
-            8,
-            74,
-            vec!["Note3Scale>+", "Note3Scale<+", "Run>+", "Run<+", "Vault4>+"],
-        ),
-        (
-            9,
-            76,
-            vec!["Note3Scale>+", "Note3Scale<+", "Run>+", "Run<+", "ReturnCrazyDriver>+", "Vault4>+"],
-        )
+        let figures = FigureMatcher::matching_figures(&melody);
+        let expected = [
+            (
+                0,
+                79,
+                vec!["Note3Scale>-", "Note3Scale<-", "Run>-", "Run<-"],
+            ),
+            (
+                1,
+                78,
+                vec!["Note3Scale>-", "Note3Scale<-", "Run>-", "Run<-"],
+            ),
+            (
+                2,
+                76,
+                vec!["Note3Scale>-", "Note3Scale<-", "Run>-", "Run<-"],
+            ),
+            (
+                3,
+                74,
+                vec!["Note3Scale>-", "Note3Scale<-", "Run>-", "Run<-"],
+            ),
+            (
+                4,
+                72,
+                vec!["Note3Scale>-", "Note3Scale<-", "Run>-", "Run<-"],
+            ),
+            (
+                5,
+                71,
+                vec!["Note3Scale>-", "Note3Scale<-", "Run>-", "Run<-"],
+            ),
+            (
+                6,
+                69,
+                vec!["Note3Scale>-", "Note3Scale<-", "Run>-", "Run<-"],
+            ),
+            (
+                7,
+                67,
+                vec!["Note3Scale>-", "Note3Scale<-", "Run>-", "Run<-", "Vault4>+"],
+            ),
+            (
+                8,
+                74,
+                vec!["Note3Scale>+", "Note3Scale<+", "Run>+", "Run<+", "Vault4>+"],
+            ),
+            (
+                9,
+                76,
+                vec![
+                    "Note3Scale>+",
+                    "Note3Scale<+",
+                    "Run>+",
+                    "Run<+",
+                    "ReturnCrazyDriver>+",
+                    "Vault4>+",
+                ],
+            ),
+            (
+                11,
+                78,
+                vec![
+                    "Note3Scale>+",
+                    "Note3Scale<+",
+                    "Auxiliary<+",
+                    "Auxiliary>-",
+                    "Run>+",
+                    "Run<+",
+                    "ReturnCrazyDriver>+",
+                    "ReturnCrazyDriver<-",
+                ],
+            ),
+            (
+                13,
+                79,
+                vec![
+                    "Note3Scale>+",
+                    "Note3Scale<+",
+                    "Note3Scale>-",
+                    "Note3Scale<-",
+                    "Auxiliary<+",
+                    "Auxiliary>-",
+                    "Run>+",
+                    "Run<+",
+                    "Run>-",
+                    "Run<-",
+                    "ReturnCrazyDriver>+",
+                    "ReturnCrazyDriver<-",
+                ],
+            ),
+            (
+                16,
+                78,
+                vec![
+                    "Note3Scale>-",
+                    "Note3Scale<-",
+                    "Auxiliary<+",
+                    "Auxiliary>-",
+                    "Run>-",
+                    "Run<-",
+                    "ReturnCrazyDriver>+",
+                    "ReturnCrazyDriver<-",
+                ],
+            ),
+            (
+                17,
+                76,
+                vec![
+                    "Note3Scale>-",
+                    "Note3Scale<-",
+                    "Run>-",
+                    "Run<-",
+                    "ReturnCrazyDriver<-",
+                ],
+            ),
+            (
+                18,
+                74,
+                vec!["Note3Scale>-", "Note3Scale<-", "Run>-", "Run<-"],
+            ),
+            (
+                20,
+                72,
+                vec![
+                    "Note3Scale>-",
+                    "Note3Scale<-",
+                    "Run>-",
+                    "Run<-",
+                    "ParkourBounce2<-",
+                    "ZigZag2>+",
+                    "ZigZag2<+",
+                ],
+            ),
+            (
+                21,
+                71,
+                vec![
+                    "Note3Scale>-",
+                    "Note3Scale<-",
+                    "Run>-",
+                    "Run<-",
+                    "ParkourBounce2>-",
+                    "ParkourBounce2<-",
+                    "ZigZag2>+",
+                    "ZigZag2<+",
+                ],
+            ),
+            (
+                22,
+                79,
+                vec![
+                    "Note3Scale>-",
+                    "Note3Scale<-",
+                    "Run>-",
+                    "Run<-",
+                    "ParkourBounce2>-",
+                    "ParkourBounce2<-",
+                    "ZigZag2>+",
+                    "ZigZag2<+",
+                ],
+            ),
+            (
+                24,
+                78,
+                vec![
+                    "Note3Scale>-",
+                    "Note3Scale<-",
+                    "Run>-",
+                    "Run<-",
+                    "ParkourBounce2>-",
+                    "ZigZag2>+",
+                    "ZigZag2<+",
+                ],
+            ),
+            (
+                25,
+                76,
+                vec!["Note3Scale>-", "Note3Scale<-", "Run>-", "Run<-"],
+            ),
+            (
+                26,
+                74,
+                vec![
+                    "Note3Scale>-",
+                    "Note3Scale<-",
+                    "Run>-",
+                    "Run<-",
+                    "ReturnCrazyDriver>-",
+                ],
+            ),
         ];
         for (i, figs) in figures.iter() {
             let figstr = figs.iter().map(|f| format!("{f} ")).collect::<String>();
             println!("{i}: {} {figstr}\n", melody[*i].pitch());
         }
         for ((i, figs), (ei, ep, efigs)) in figures.iter().zip(expected.iter()) {
+            let figstr = figs.iter().map(|f| format!("{f} ")).collect::<String>();
+            let efigstr = efigs.iter().map(|f| format!("{f} ")).collect::<String>();
+            println!("{i}: {}  found {figstr}", melody[*i].pitch());
+            println!("{i}: expecting {efigstr}\n");
             assert_eq!(i, ei);
             assert_eq!(melody[*i].pitch(), *ep);
             assert_eq!(figs.len(), efigs.len());
@@ -303,5 +539,27 @@ mod tests {
                 assert_eq!(format!("{fig}"), *efig);
             }
         }
+    }
+
+    #[test]
+    fn show_tables() {
+        let melody = Melody::from_file("joy_world_2")
+            .unwrap()
+            .without_ghosts(0.05);
+        FigureMatcher::show_tables_for(&melody);
+    }
+
+    #[test]
+    fn show_not_melodic() {
+        let melody = Melody::from_file("NotMelodic2")
+            .unwrap()
+            .without_ghosts(0.05);
+        let figures = FigureMatcher::matching_figures(&melody);
+        for (i, figs) in figures.iter() {
+            let figstr = figs.iter().map(|f| format!("{f} ")).collect::<String>();
+            println!("{i}: {} {figstr}\n", melody[*i].pitch());
+        }
+
+        FigureMatcher::show_tables_for(&melody);
     }
 }
