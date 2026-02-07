@@ -282,9 +282,7 @@ impl<'a> FigureMatcher<'a> {
     }
 
     fn any_property(&self, ci: usize, fig: &MelodicFigure) -> bool {
-        self.start_property(ci, fig)
-                    || self.within_property(ci, fig)
-                    || self.end_property(ci, fig)
+        self.start_property(ci, fig) || self.within_property(ci, fig) || self.end_property(ci, fig)
     }
 
     fn within_property(&self, ci: usize, fig: &MelodicFigure) -> bool {
