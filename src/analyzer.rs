@@ -256,7 +256,7 @@ impl Melody {
     }
 
     pub fn phrase_starts_at(&self, i: usize) -> bool {
-        i == 0 || self.phrase_starts_at(i - 1)
+        i == 0 || self.phrase_ends_at(i - 1)
     }
 
     pub fn phrase_ends_at(&self, i: usize) -> bool {

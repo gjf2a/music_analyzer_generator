@@ -293,6 +293,7 @@ impl<'a> FigureMatcher<'a> {
         self.end_table[ci].1.contains(fig)
             && (self.start_table[ci].1.len() > 0
                 || self.within_table[ci].1.len() > 0
+                || ci + 1 == self.consolidated.len()
                 || same_octave(self.consolidated[ci].1, self.consolidated[ci + 1].1)
                 || self.melody.phrase_ends_at(self.consolidated[ci].0))
     }
@@ -301,6 +302,7 @@ impl<'a> FigureMatcher<'a> {
         self.start_table[ci].1.contains(fig)
             && (self.end_table[ci].1.len() > 0
                 || self.within_table[ci].1.len() > 0
+                || ci == 0
                 || same_octave(self.consolidated[ci - 1].1, self.consolidated[ci].1)
                 || self.melody.phrase_starts_at(self.consolidated[ci].0))
     }
