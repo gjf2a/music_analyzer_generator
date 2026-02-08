@@ -4,7 +4,7 @@ use enum_iterator::{Sequence, all};
 
 use crate::{analyzer::Melody, notes::octave_equivalent, scales::RootedScale};
 
-// Inspired by: https://figuringoutmelody.com/the-24-universal-melodic-figures/
+// Inspired by: https://figuringoutmelody.com/the-building-blocks-of-melody/
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Sequence, Hash, Ord, PartialOrd)]
 pub struct MelodicFigure {
     shape: MelodicFigureShape,
@@ -219,11 +219,23 @@ impl<'a> FigureMatcher<'a> {
         matcher
     }
 
-    pub fn matching_figures(melody: &'a Melody) -> Vec<(usize, BTreeSet<MelodicFigure>)> {
+    pub fn matching_figures_consolidated(melody: &'a Melody) -> Vec<(usize, BTreeSet<MelodicFigure>)> {
         let matcher = Self::new(melody);
         let mut result = vec![];
         for (ci, (mi, _, _)) in matcher.consolidated.iter().copied().enumerate() {
             result.push((mi, matcher.matching_figures_at(ci)));
+        }
+        result
+    }
+
+    pub fn matching_figures(melody: &'a Melody) -> Vec<BTreeSet<MelodicFigure>> {
+        let mfc = Self::matching_figures_consolidated(melody);
+        let mut result = vec![];
+        for i in 0..mfc.len() {
+            let end = if i + 1 == mfc.len() {melody.len()} else {mfc[i + 1].0};
+            for _ in mfc[i].0..end {
+                result.push(mfc[i].1.clone());
+            }
         }
         result
     }
@@ -328,7 +340,7 @@ mod tests {
         let melody = Melody::from_file("joy_world_2")
             .unwrap()
             .without_ghosts(0.05);
-        let figures = FigureMatcher::matching_figures(&melody);
+        let figures = FigureMatcher::matching_figures_consolidated(&melody);
         let expected = [
             (
                 0,
@@ -789,6 +801,14 @@ mod tests {
             }
         }
         assert_eq!(figures.iter().count(), expected.len());
+
+        let full_match = FigureMatcher::matching_figures(&melody);
+        for ci in 0..figures.len() {
+            let end = if ci + 1 == figures.len() {melody.len()} else {figures[ci + 1].0};
+            for mi in figures[ci].0..end {
+                assert_eq!(full_match[mi], figures[ci].1);
+            }
+        }
     }
 
     // Exploration tests. These do not contain assertions and I ultimately plan to
@@ -839,7 +859,7 @@ mod tests {
         let melody = Melody::from_file("NotMelodic2")
             .unwrap()
             .without_ghosts(0.05);
-        let figures = FigureMatcher::matching_figures(&melody);
+        let figures = FigureMatcher::matching_figures_consolidated(&melody);
         for (i, figs) in figures.iter() {
             let figstr = figs.iter().map(|f| format!("{f} ")).collect::<String>();
             println!("{i}: {} {figstr}\n", melody[*i].pitch());
