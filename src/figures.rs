@@ -2,7 +2,7 @@ use std::{collections::BTreeSet, fmt::Display};
 
 use enum_iterator::{Sequence, all};
 
-use crate::{analyzer::Melody, notes::same_octave, scales::RootedScale};
+use crate::{analyzer::Melody, notes::octave_equivalent, scales::RootedScale};
 
 // Inspired by: https://figuringoutmelody.com/the-24-universal-melodic-figures/
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Sequence, Hash, Ord, PartialOrd)]
@@ -61,6 +61,27 @@ impl MelodicFigure {
         result
     }
 
+    pub fn projected_notes_from(&self, starting_pitch: u8, scale: &RootedScale) -> Vec<u8> {
+        let mut pattern_notes = vec![starting_pitch];
+        for diatonic_steps in self.pattern() {
+            let current = pattern_notes[pattern_notes.len() - 1];
+            if diatonic_steps > 0 {
+                pattern_notes.push(
+                    scale
+                        .note_up(current, diatonic_steps as usize + 1)
+                        .unwrap(),
+                );
+            } else {
+                pattern_notes.push(
+                    scale
+                        .note_down(current, -(diatonic_steps) as usize + 1)
+                        .unwrap(),
+                );
+            }
+        }
+        pattern_notes
+    }
+
     pub fn len(&self) -> usize {
         self.pattern().len() + 1
     }
@@ -80,7 +101,7 @@ pub enum MelodicFigureShape {
     Trill1,
     Trill2,
     Arch,
-    NP3,
+    NotePentatonic3,
     PivotLHP,
     ReturnCrazyDriver,
     ArpeggioPlus,
@@ -118,7 +139,7 @@ impl MelodicFigureShape {
             Self::Trill1 => vec![1, -1, 1],
             Self::Trill2 => vec![2, -2, 2],
             Self::Arch => vec![2, 2, -2],
-            Self::NP3 => vec![-2, -1],
+            Self::NotePentatonic3 => vec![-2, -1],
             Self::PivotLHP => vec![1, -2],
             Self::ReturnCrazyDriver => vec![1, 1, -1],
             Self::ArpeggioPlus => vec![2, 2, -1],
@@ -232,46 +253,30 @@ impl<'a> FigureMatcher<'a> {
         if i < pattern.len() {
             false
         } else {
-            self.pattern_aligned_at(i - pattern.len(), &pattern)
+            self.figure_aligned_at(i - pattern.len(), fig)
         }
     }
 
     fn starts_at(&self, i: usize, fig: MelodicFigure) -> bool {
-        let pattern = fig.pattern();
-        self.pattern_aligned_at(i, &pattern)
+        self.figure_aligned_at(i, fig)
     }
 
     fn within(&self, i: usize, fig: MelodicFigure) -> bool {
         let pattern = fig.pattern();
         (2..=pattern.len()).map(|len| len - 1).any(|offset| {
-            pattern.len() > offset && i >= offset && self.pattern_aligned_at(i - offset, &pattern)
+            pattern.len() > offset && i >= offset && self.figure_aligned_at(i - offset, fig)
         })
     }
 
-    fn pattern_aligned_at(&self, pattern_start: usize, pattern: &Vec<i16>) -> bool {
-        if pattern_start + pattern.len() >= self.consolidated.len() {
+    fn figure_aligned_at(&self, figure_start: usize, figure: MelodicFigure) -> bool {
+        let pattern = figure.pattern();
+        if figure_start + pattern.len() >= self.consolidated.len() {
             return false;
         }
-        let mut pattern_notes = vec![self.consolidated[pattern_start].1];
-        for diatonic_steps in pattern.iter() {
-            let current = pattern_notes[pattern_notes.len() - 1];
-            if *diatonic_steps > 0 {
-                pattern_notes.push(
-                    self.scale
-                        .note_up(current, *diatonic_steps as usize + 1)
-                        .unwrap(),
-                );
-            } else {
-                pattern_notes.push(
-                    self.scale
-                        .note_down(current, -(*diatonic_steps) as usize + 1)
-                        .unwrap(),
-                );
-            }
-        }
+        let pattern_notes = figure.projected_notes_from(self.consolidated[figure_start].1, &self.scale);
         (0..pattern_notes.len()).all(|k| {
-            k + pattern_start >= self.consolidated.len()
-                || self.consolidated[k + pattern_start].1 == pattern_notes[k]
+            k + figure_start >= self.consolidated.len()
+                || self.consolidated[k + figure_start].1 == pattern_notes[k]
         })
     }
 
@@ -293,24 +298,29 @@ impl<'a> FigureMatcher<'a> {
         self.end_table[ci].1.contains(fig)
             && (self.start_table[ci].1.len() > 0
                 || self.within_table[ci].1.len() > 0
-                || ci + 1 == self.consolidated.len()
-                || same_octave(self.consolidated[ci].1, self.consolidated[ci + 1].1)
-                || self.melody.phrase_ends_at(self.consolidated[ci].0))
+                || self.melody.phrase_ends_at(self.consolidated[ci].0)
+                || self.melody.phrase_ends_at(self.consolidated[ci + 1].0) && octave_equivalent(self.consolidated[ci].1, self.consolidated[ci + 1].1))
+            //|| (ci > 0 && self.end_table[ci - 1].1.contains(fig) && octave_equivalent(self.consolidated[ci - 1].1, self.consolidated[ci].1))
     }
 
     fn start_property(&self, ci: usize, fig: &MelodicFigure) -> bool {
         self.start_table[ci].1.contains(fig)
             && (self.end_table[ci].1.len() > 0
                 || self.within_table[ci].1.len() > 0
-                || ci == 0
-                || same_octave(self.consolidated[ci - 1].1, self.consolidated[ci].1)
-                || self.melody.phrase_starts_at(self.consolidated[ci].0))
+                //|| ci == 0
+                //|| same_octave(self.consolidated[ci - 1].1, self.consolidated[ci].1)
+                || self.melody.phrase_starts_at(self.consolidated[ci].0)
+                || self.end_table[ci - 1].1.len() > 0 && octave_equivalent(self.consolidated[ci - 1].1, self.consolidated[ci].1))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{analyzer::Melody, figures::FigureMatcher};
+    use std::collections::BTreeSet;
+
+    use enum_iterator::all;
+
+    use crate::{analyzer::Melody, figures::{FigureMatcher, MelodicFigure, figures2string}, notes::NoteName, scales::ScaleMode};
 
     #[test]
     fn test_matching_figures() {
@@ -642,7 +652,7 @@ mod tests {
                     "Note3Scale<+",
                     "Auxiliary<+",
                     "Auxiliary>-",
-                    "NP3<+",
+                    "NotePentatonic3<+",
                     "ReturnCrazyDriver>+",
                     "ReturnCrazyDriver<+",
                 ],
@@ -650,10 +660,10 @@ mod tests {
             (
                 47,
                 71,
-                vec!["Auxiliary<+", "Auxiliary>-", "NP3<+", "ReturnCrazyDriver>+"],
+                vec!["Auxiliary<+", "Auxiliary>-", "NotePentatonic3<+", "ReturnCrazyDriver>+"],
             ),
-            (48, 67, vec!["NP3<+"]),
-            (49, 79, vec!["NP3>+", "LeapingScale<-"]),
+            (48, 67, vec!["NotePentatonic3<+"]),
+            (49, 79, vec!["NotePentatonic3>+", "LeapingScale<-"]),
             (
                 50,
                 76,
@@ -662,7 +672,7 @@ mod tests {
                     "Note3Scale<-",
                     "Run>-",
                     "Run<-",
-                    "NP3>+",
+                    "NotePentatonic3>+",
                     "LeapingScale<-",
                 ],
             ),
@@ -674,7 +684,7 @@ mod tests {
                     "Note3Scale<-",
                     "Run>-",
                     "Run<-",
-                    "NP3>+",
+                    "NotePentatonic3>+",
                     "ReturnCrazyDriver>-",
                     "LeapingScale<-",
                 ],
@@ -764,6 +774,7 @@ mod tests {
             ),
         ];
         for ((i, figs), (ei, ep, efigs)) in figures.iter().zip(expected.iter()) {
+            println!("{i}: {}", figures2string(figs.iter()));
             assert_eq!(i, ei);
             assert_eq!(melody[*i].pitch(), *ep);
             assert_eq!(figs.len(), efigs.len());
@@ -772,6 +783,37 @@ mod tests {
             }
         }
         assert_eq!(figures.iter().count(), expected.len());
+    }
+
+    // Exploration tests. These do not contain assertions and I ultimately plan to
+    // delete them, or evolve the into "real" tests. They are here to explore.
+
+    #[test]
+    fn test_note_projection() {
+        let pitch = 60;
+        let scale = ScaleMode::Major.rooted(NoteName::name_of(pitch));
+        let mut option_sets_3 = vec![BTreeSet::new(), BTreeSet::new(), BTreeSet::new()];
+        let mut option_sets_4 = vec![BTreeSet::new(), BTreeSet::new(), BTreeSet::new(), BTreeSet::new()];
+        for figure in all::<MelodicFigure>() {
+            let projected = figure.projected_notes_from(pitch, &scale);
+            for i in 0..projected.len() {
+                if figure.len() == 3 {
+                    option_sets_3[i].insert(projected[i]);
+                } else {
+                    option_sets_4[i].insert(projected[i]);
+                }
+                
+            }
+            println!("{figure} {projected:?}");
+        }
+        println!("3-note figures");
+        for i in 0..option_sets_3.len() {
+            println!("options for {}: {:?}", i, option_sets_3[i]);
+        }
+        println!("4-note figures");
+        for i in 0..option_sets_4.len() {
+            println!("options for {}: {:?}", i, option_sets_4[i]);
+        }
     }
 
     #[test]

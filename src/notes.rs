@@ -4,7 +4,7 @@ use enum_iterator::Sequence;
 
 use crate::MAJOR_ROOT_IDS;
 
-pub fn same_octave(p1: u8, p2: u8) -> bool {
+pub fn octave_equivalent(p1: u8, p2: u8) -> bool {
     p1 % 12 == p2 % 12
 }
 
