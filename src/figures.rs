@@ -310,19 +310,7 @@ impl<'a> FigureMatcher<'a> {
 
 #[cfg(test)]
 mod tests {
-    use enum_iterator::all;
-
-    use crate::{
-        analyzer::Melody,
-        figures::{FigureMatcher, MelodicFigure},
-    };
-
-    #[test]
-    fn see_sequence() {
-        for mf in all::<MelodicFigure>() {
-            println!("{mf:?}");
-        }
-    }
+    use crate::{analyzer::Melody, figures::FigureMatcher};
 
     #[test]
     fn test_matching_figures() {
