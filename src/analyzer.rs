@@ -24,8 +24,20 @@ impl ChordProgression {
         self.chords_starts.iter().map(|(c, _)| *c)
     }
 
-    pub fn chord_start_iter(&self) -> impl Iterator<Item = (ChordName, f64)> {
-        self.chords_starts.iter().copied()
+    pub fn chord_start_end_iter(&self) -> impl Iterator<Item = (ChordName, f64, f64)> {
+        (0..self.len()).map(|i| self.chord_start_end(i))
+    }
+
+    pub fn chord_at_time(&self, timestamp: f64) -> Option<ChordName> {
+        self.chord_start_end_iter()
+            .find(|(_, start, end)| *start <= timestamp && timestamp <= *end)
+            .map(|(chord, _, _)| chord)
+    }
+
+    pub fn chord_start_end(&self, index: usize) -> (ChordName, f64, f64) {
+        let (chord, start) = self.chords_starts[index];
+        let end = if index + 1 == self.len() { self.duration } else { self.chords_starts[index + 1].1};
+        (chord, start, end)
     }
 
     pub fn len(&self) -> usize {
@@ -351,6 +363,8 @@ mod tests {
 
     use crate::analyzer::ChordProgression;
     use crate::analyzer::Melody;
+    use crate::chords::ChordMode;
+    use crate::chords::ChordName;
     use crate::notes::NoteName;
 
     use crate::notes::Accidental::Flat as F;
@@ -409,6 +423,20 @@ mod tests {
                 assert_eq!(closest[i], readable[i]);
                 assert_eq!(closest[i].1, closest_match[i].mode());
                 assert_eq!(closest[i].2, closest_match[i].root_name());
+            }
+        }
+    }
+
+    #[test]
+    fn test_chord_at_time() {
+        for (filename, times, goals) in [
+            ("healing4", vec![1.0], vec![(NL::A, N, ChordMode::Major)])
+        ] {
+            let recording: Recording = Recording::from_file(filename).unwrap();
+            let progression = ChordProgression::from(&recording);
+            for (time, (letter, modifier, mode)) in times.iter().zip(goals.iter()) {
+                let expected_chord = ChordName::new(*letter, *modifier, *mode);
+                assert_eq!(expected_chord, progression.chord_at_time(*time).unwrap());
             }
         }
     }
