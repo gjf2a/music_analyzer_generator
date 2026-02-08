@@ -66,11 +66,7 @@ impl MelodicFigure {
         for diatonic_steps in self.pattern() {
             let current = pattern_notes[pattern_notes.len() - 1];
             if diatonic_steps > 0 {
-                pattern_notes.push(
-                    scale
-                        .note_up(current, diatonic_steps as usize + 1)
-                        .unwrap(),
-                );
+                pattern_notes.push(scale.note_up(current, diatonic_steps as usize + 1).unwrap());
             } else {
                 pattern_notes.push(
                     scale
@@ -273,7 +269,8 @@ impl<'a> FigureMatcher<'a> {
         if figure_start + pattern.len() >= self.consolidated.len() {
             return false;
         }
-        let pattern_notes = figure.projected_notes_from(self.consolidated[figure_start].1, &self.scale);
+        let pattern_notes =
+            figure.projected_notes_from(self.consolidated[figure_start].1, &self.scale);
         (0..pattern_notes.len()).all(|k| {
             k + figure_start >= self.consolidated.len()
                 || self.consolidated[k + figure_start].1 == pattern_notes[k]
@@ -299,7 +296,8 @@ impl<'a> FigureMatcher<'a> {
             && (self.start_table[ci].1.len() > 0
                 || self.within_table[ci].1.len() > 0
                 || self.melody.phrase_ends_at(self.consolidated[ci].0)
-                || self.melody.phrase_ends_at(self.consolidated[ci + 1].0) && octave_equivalent(self.consolidated[ci].1, self.consolidated[ci + 1].1))
+                || self.melody.phrase_ends_at(self.consolidated[ci + 1].0)
+                    && octave_equivalent(self.consolidated[ci].1, self.consolidated[ci + 1].1))
     }
 
     fn start_property(&self, ci: usize, fig: &MelodicFigure) -> bool {
@@ -307,7 +305,8 @@ impl<'a> FigureMatcher<'a> {
             && (self.end_table[ci].1.len() > 0
                 || self.within_table[ci].1.len() > 0
                 || self.melody.phrase_starts_at(self.consolidated[ci].0)
-                || self.end_table[ci - 1].1.len() > 0 && octave_equivalent(self.consolidated[ci - 1].1, self.consolidated[ci].1))
+                || self.end_table[ci - 1].1.len() > 0
+                    && octave_equivalent(self.consolidated[ci - 1].1, self.consolidated[ci].1))
     }
 }
 
@@ -317,7 +316,12 @@ mod tests {
 
     use enum_iterator::all;
 
-    use crate::{analyzer::Melody, figures::{FigureMatcher, MelodicFigure, figures2string}, notes::NoteName, scales::ScaleMode};
+    use crate::{
+        analyzer::Melody,
+        figures::{FigureMatcher, MelodicFigure, figures2string},
+        notes::NoteName,
+        scales::ScaleMode,
+    };
 
     #[test]
     fn test_matching_figures() {
@@ -657,7 +661,12 @@ mod tests {
             (
                 47,
                 71,
-                vec!["Auxiliary<+", "Auxiliary>-", "NotePentatonic3<+", "ReturnCrazyDriver>+"],
+                vec![
+                    "Auxiliary<+",
+                    "Auxiliary>-",
+                    "NotePentatonic3<+",
+                    "ReturnCrazyDriver>+",
+                ],
             ),
             (48, 67, vec!["NotePentatonic3<+"]),
             (49, 79, vec!["NotePentatonic3>+", "LeapingScale<-"]),
@@ -790,7 +799,12 @@ mod tests {
         let pitch = 60;
         let scale = ScaleMode::Major.rooted(NoteName::name_of(pitch));
         let mut option_sets_3 = vec![BTreeSet::new(), BTreeSet::new(), BTreeSet::new()];
-        let mut option_sets_4 = vec![BTreeSet::new(), BTreeSet::new(), BTreeSet::new(), BTreeSet::new()];
+        let mut option_sets_4 = vec![
+            BTreeSet::new(),
+            BTreeSet::new(),
+            BTreeSet::new(),
+            BTreeSet::new(),
+        ];
         for figure in all::<MelodicFigure>() {
             let projected = figure.projected_notes_from(pitch, &scale);
             for i in 0..projected.len() {
@@ -799,7 +813,6 @@ mod tests {
                 } else {
                     option_sets_4[i].insert(projected[i]);
                 }
-                
             }
             println!("{figure} {projected:?}");
         }
