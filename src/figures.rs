@@ -300,15 +300,12 @@ impl<'a> FigureMatcher<'a> {
                 || self.within_table[ci].1.len() > 0
                 || self.melody.phrase_ends_at(self.consolidated[ci].0)
                 || self.melody.phrase_ends_at(self.consolidated[ci + 1].0) && octave_equivalent(self.consolidated[ci].1, self.consolidated[ci + 1].1))
-            //|| (ci > 0 && self.end_table[ci - 1].1.contains(fig) && octave_equivalent(self.consolidated[ci - 1].1, self.consolidated[ci].1))
     }
 
     fn start_property(&self, ci: usize, fig: &MelodicFigure) -> bool {
         self.start_table[ci].1.contains(fig)
             && (self.end_table[ci].1.len() > 0
                 || self.within_table[ci].1.len() > 0
-                //|| ci == 0
-                //|| same_octave(self.consolidated[ci - 1].1, self.consolidated[ci].1)
                 || self.melody.phrase_starts_at(self.consolidated[ci].0)
                 || self.end_table[ci - 1].1.len() > 0 && octave_equivalent(self.consolidated[ci - 1].1, self.consolidated[ci].1))
     }
