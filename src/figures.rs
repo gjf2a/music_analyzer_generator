@@ -662,28 +662,10 @@ mod tests {
             (
                 47,
                 71,
-                vec![
-                    "Auxiliary<+",
-                    "Auxiliary>-",
-                    "NP3<+",
-                    "ReturnCrazyDriver>+",
-                ],
+                vec!["Auxiliary<+", "Auxiliary>-", "NP3<+", "ReturnCrazyDriver>+"],
             ),
-            (
-                48,
-                67,
-                vec![
-                    "NP3<+",
-                ],
-            ),
-            (
-                49,
-                79,
-                vec![
-                    "NP3>+",
-                    "LeapingScale<-"
-                ],
-            ),
+            (48, 67, vec!["NP3<+"]),
+            (49, 79, vec!["NP3>+", "LeapingScale<-"]),
             (
                 50,
                 76,
@@ -693,7 +675,7 @@ mod tests {
                     "Run>-",
                     "Run<-",
                     "NP3>+",
-                    "LeapingScale<-"
+                    "LeapingScale<-",
                 ],
             ),
             (
@@ -706,7 +688,7 @@ mod tests {
                     "Run<-",
                     "NP3>+",
                     "ReturnCrazyDriver>-",
-                    "LeapingScale<-"
+                    "LeapingScale<-",
                 ],
             ),
             (
@@ -722,7 +704,7 @@ mod tests {
                     "Trill1>-",
                     "Trill1<-",
                     "ReturnCrazyDriver>-",
-                    "LeapingScale<-"
+                    "LeapingScale<-",
                 ],
             ),
             (
@@ -790,23 +772,10 @@ mod tests {
             (
                 57,
                 67,
-                vec![
-                    "Note3Scale>-",
-                    "Note3Scale<-",
-                    "Run>-",
-                    "Run<-",
-                ],
+                vec!["Note3Scale>-", "Note3Scale<-", "Run>-", "Run<-"],
             ),
         ];
-        for (i, figs) in figures.iter() {
-            let figstr = figs.iter().map(|f| format!("{f} ")).collect::<String>();
-            println!("{i}: {} {figstr}\n", melody[*i].pitch());
-        }
         for ((i, figs), (ei, ep, efigs)) in figures.iter().zip(expected.iter()) {
-            let figstr = figs.iter().map(|f| format!("{f} ")).collect::<String>();
-            let efigstr = efigs.iter().map(|f| format!("{f} ")).collect::<String>();
-            println!("{i}: {}  found {figstr}", melody[*i].pitch());
-            println!("{i}: expecting {efigstr}\n");
             assert_eq!(i, ei);
             assert_eq!(melody[*i].pitch(), *ep);
             assert_eq!(figs.len(), efigs.len());
@@ -814,6 +783,7 @@ mod tests {
                 assert_eq!(format!("{fig}"), *efig);
             }
         }
+        assert_eq!(figures.iter().count(), expected.len());
     }
 
     #[test]
