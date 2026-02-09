@@ -1,6 +1,7 @@
 use std::{fmt::Display, ops::Add};
 
 use enum_iterator::Sequence;
+use midi_msg::{Channel, ChannelVoiceMsg, MidiMsg};
 
 use crate::MAJOR_ROOT_IDS;
 
@@ -276,6 +277,14 @@ impl Note {
         }
     }
 
+    pub fn repitched(&self, repitch: u8) -> Self {
+        Self {
+            pitch: repitch,
+            velocity: self.velocity,
+            duration: self.duration,
+        }
+    }
+
     pub fn is_rest(&self) -> bool {
         self.velocity == 0
     }
@@ -294,6 +303,13 @@ impl Note {
 
     pub fn set_duration(&mut self, new_duration: f64) {
         self.duration = new_duration;
+    }
+}
+
+impl From<Note> for (f64, MidiMsg) {
+    fn from(value: Note) -> Self {
+        let msg = if value.velocity == 0  {ChannelVoiceMsg::NoteOff {note: value.pitch, velocity: value.velocity} } else {ChannelVoiceMsg::NoteOn { note: value.pitch, velocity: value.velocity }};
+        (value.duration, MidiMsg::ChannelVoice { channel: Channel::Ch1, msg })
     }
 }
 

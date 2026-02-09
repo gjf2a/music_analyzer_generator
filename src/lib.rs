@@ -3,6 +3,7 @@ pub mod chords;
 pub mod figures;
 pub mod notes;
 pub mod scales;
+pub mod generator;
 
 use std::collections::VecDeque;
 
@@ -381,7 +382,6 @@ mod tests {
 
     use midi_msg::Channel;
     use midi_note_recorder::{Recording, midi_msg_from};
-    use rand::Rng;
 
     use crate::{ActivePitches, ChordName, NoteName, PitchSequence};
 
@@ -394,12 +394,11 @@ mod tests {
 
     #[test]
     fn test_active_pitches() {
-        let mut rng = rand::rng();
         let mut active = ActivePitches::default();
         let mut active_tester = BTreeSet::new();
         for _ in 0..100 {
-            if active.len() == 0 || rng.random_bool(0.5) {
-                let note = rng.random_range(0..=127);
+            if active.len() == 0 || rand::random_bool(0.5) {
+                let note = rand::random_range(0..=127);
                 let already = active.is_active(note);
                 let msg = midi_msg_from(Channel::Ch1, note, 1);
                 let prev_len = active.len();
@@ -411,7 +410,7 @@ mod tests {
                 active_tester.insert(note);
             } else {
                 let pitches = active.iter().collect::<Vec<_>>();
-                let remove = pitches[rng.random_range(0..pitches.len())];
+                let remove = pitches[rand::random_range(0..pitches.len())];
                 let msg = midi_msg_from(Channel::Ch1, remove, 0);
                 let prev_len = active.len();
                 active.update_from(&msg);

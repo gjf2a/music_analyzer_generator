@@ -169,8 +169,20 @@ impl Melody {
         Ok(Self::from(&r))
     }
 
+    pub fn new() -> Self {
+        Self {notes: vec![]}
+    }
+
     pub fn len(&self) -> usize {
         self.notes.len()
+    }
+
+    pub fn push(&mut self, note: Note) {
+        self.notes.push(note);
+    }
+
+    pub fn pop(&mut self) -> Option<Note> {
+        self.notes.pop()
     }
 
     pub fn starts_notes_lens(&'_ self) -> ConsolidatedIter<'_> {

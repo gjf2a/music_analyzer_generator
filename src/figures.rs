@@ -219,6 +219,10 @@ impl<'a> FigureMatcher<'a> {
         matcher
     }
 
+    pub fn all_notes_matching(melody: &'a Melody) -> bool {
+        Self::matching_figures_consolidated(melody).iter().all(|(_,figs)| figs.len() > 0)
+    }
+
     pub fn matching_figures_consolidated(melody: &'a Melody) -> Vec<(usize, BTreeSet<MelodicFigure>)> {
         let matcher = Self::new(melody);
         let mut result = vec![];
