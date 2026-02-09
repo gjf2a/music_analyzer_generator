@@ -818,6 +818,7 @@ mod tests {
     fn test_note_projection() {
         let pitch = 60;
         let scale = ScaleMode::Major.rooted(NoteName::name_of(pitch));
+        let mut patterns = BTreeSet::<Vec<u8>>::new();
         let mut option_sets_3 = vec![BTreeSet::new(), BTreeSet::new(), BTreeSet::new()];
         let mut option_sets_4 = vec![
             BTreeSet::new(),
@@ -827,6 +828,7 @@ mod tests {
         ];
         for figure in all::<MelodicFigure>() {
             let projected = figure.projected_notes_from(pitch, &scale);
+            patterns.insert(projected.clone());
             for i in 0..projected.len() {
                 if figure.len() == 3 {
                     option_sets_3[i].insert(projected[i]);
@@ -840,10 +842,14 @@ mod tests {
         for i in 0..option_sets_3.len() {
             println!("options for {}: {:?}", i, option_sets_3[i]);
         }
+        let combos3 = option_sets_3.iter().map(|n| n.len()).product::<usize>();
         println!("4-note figures");
         for i in 0..option_sets_4.len() {
             println!("options for {}: {:?}", i, option_sets_4[i]);
         }
+        let combos4 = option_sets_4.iter().map(|n| n.len()).product::<usize>();
+        println!("{} total projections", patterns.len());
+        println!("Imaginable combos: 3: {combos3} 4: {combos4}");
     }
 
     #[test]
