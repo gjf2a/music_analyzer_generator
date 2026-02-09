@@ -2,6 +2,7 @@ use std::{cmp::Ordering, collections::HashMap, ops::Index};
 
 use hash_histogram::HashHistogram;
 use midi_fundsp::note_velocity_from;
+use midi_msg::MidiMsg;
 
 use crate::{
     ChordName, NoteName, PitchSequence,
@@ -191,6 +192,10 @@ impl Melody {
             len: 1,
             melody: self,
         }
+    }
+
+    pub fn midi(&self) -> Vec<(f64, MidiMsg)> {
+        self.iter().map(|n| (*n).into()).collect()
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &Note> {
