@@ -15,7 +15,7 @@ pub fn generate_melody_from(src: &Melody) -> Option<Melody> {
     }
     let mut offset_intervals = (1..=7).flat_map(|n| [true, false].into_iter().map(move |b| (n, b))).collect::<Vec<_>>();
     offset_intervals.push((0, false));
-    for i in result.len()..src.len() {
+    for i in (result.len() - 1)..src.len() {
         let current = result[i].pitch();
         offset_intervals.shuffle(&mut rand::rng());
         for (interval, up) in offset_intervals.iter() {
