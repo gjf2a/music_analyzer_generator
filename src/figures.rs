@@ -78,6 +78,17 @@ impl MelodicFigure {
         pattern_notes
     }
 
+    pub fn fits_at(&self, melody: &Melody, scale: &RootedScale, start: usize) -> bool {
+        let projection = self.projected_notes_from(melody[start].pitch(), scale);
+        let melody_notes = melody.distinct_pitch_segment(start, projection.len());
+        println!("projection: {projection:?}");
+        println!("melody:     {melody_notes:?}");
+        projection
+            .iter()
+            .zip(melody_notes.iter())
+            .all(|(pn, mn)| pn == mn)
+    }
+
     pub fn len(&self) -> usize {
         self.pattern().len() + 1
     }
@@ -220,10 +231,14 @@ impl<'a> FigureMatcher<'a> {
     }
 
     pub fn all_notes_matching(melody: &'a Melody) -> bool {
-        Self::matching_figures_consolidated(melody).iter().all(|(_,figs)| figs.len() > 0)
+        Self::matching_figures_consolidated(melody)
+            .iter()
+            .all(|(_, figs)| figs.len() > 0)
     }
 
-    pub fn matching_figures_consolidated(melody: &'a Melody) -> Vec<(usize, BTreeSet<MelodicFigure>)> {
+    pub fn matching_figures_consolidated(
+        melody: &'a Melody,
+    ) -> Vec<(usize, BTreeSet<MelodicFigure>)> {
         let matcher = Self::new(melody);
         let mut result = vec![];
         for (ci, (mi, _, _)) in matcher.consolidated.iter().copied().enumerate() {
@@ -236,7 +251,11 @@ impl<'a> FigureMatcher<'a> {
         let mfc = Self::matching_figures_consolidated(melody);
         let mut result = vec![];
         for i in 0..mfc.len() {
-            let end = if i + 1 == mfc.len() {melody.len()} else {mfc[i + 1].0};
+            let end = if i + 1 == mfc.len() {
+                melody.len()
+            } else {
+                mfc[i + 1].0
+            };
             for _ in mfc[i].0..end {
                 result.push(mfc[i].1.clone());
             }
@@ -808,15 +827,47 @@ mod tests {
 
         let full_match = FigureMatcher::matching_figures(&melody);
         for ci in 0..figures.len() {
-            let end = if ci + 1 == figures.len() {melody.len()} else {figures[ci + 1].0};
+            let end = if ci + 1 == figures.len() {
+                melody.len()
+            } else {
+                figures[ci + 1].0
+            };
             for mi in figures[ci].0..end {
                 assert_eq!(full_match[mi], figures[ci].1);
             }
         }
     }
 
+    #[test]
+    fn test_fits_at() {
+        let melody = Melody::from_file("joy_world_2")
+            .unwrap()
+            .without_ghosts(0.05);
+        let figs = all::<MelodicFigure>().collect::<Vec<_>>();
+        let scale = melody.highest_weight_scale();
+        for (mi, fi, expected) in [
+            (35, 6, true),
+            (35, 0, false),
+            (56, 2, true),
+            (56, 0, false),
+            (56, 18, true),
+            (56, 22, false),
+        ] {
+            println!("{mi} {:?} ? {expected}", figs[fi]);
+            assert_eq!(figs[fi].fits_at(&melody, &scale, mi), expected);
+        }
+    }
+
     // Exploration tests. These do not contain assertions and I ultimately plan to
     // delete them, or evolve the into "real" tests. They are here to explore.
+
+    #[test]
+    fn test_show_all_figs() {
+        let all_figs = all::<MelodicFigure>().collect::<Vec<_>>();
+        for (i, fig) in all_figs.iter().enumerate() {
+            println!("{i}: {fig:?}");
+        }
+    }
 
     #[test]
     fn test_note_projection() {

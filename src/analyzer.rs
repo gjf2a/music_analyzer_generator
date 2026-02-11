@@ -1,4 +1,8 @@
-use std::{cmp::Ordering, collections::HashMap, ops::Index};
+use std::{
+    cmp::{Ordering, min},
+    collections::HashMap,
+    ops::Index,
+};
 
 use hash_histogram::HashHistogram;
 use midi_fundsp::note_velocity_from;
@@ -37,7 +41,11 @@ impl ChordProgression {
 
     pub fn chord_start_end(&self, index: usize) -> (ChordName, f64, f64) {
         let (chord, start) = self.chords_starts[index];
-        let end = if index + 1 == self.len() { self.duration } else { self.chords_starts[index + 1].1};
+        let end = if index + 1 == self.len() {
+            self.duration
+        } else {
+            self.chords_starts[index + 1].1
+        };
         (chord, start, end)
     }
 
@@ -171,7 +179,7 @@ impl Melody {
     }
 
     pub fn new() -> Self {
-        Self {notes: vec![]}
+        Self { notes: vec![] }
     }
 
     pub fn len(&self) -> usize {
@@ -293,6 +301,17 @@ impl Melody {
             || self.mean_preceding_duration(i).map_or(false, |m| {
                 self[i].duration() > PHRASE_ENDING_DURATION_MULTIPLIER * m
             })
+    }
+
+    pub fn distinct_pitch_segment(&self, start: usize, len: usize) -> Vec<u8> {
+        ConsolidatedIter {
+            start,
+            len: 1,
+            melody: self,
+        }
+        .take(min(len, self.len() - start))
+        .map(|(_, p, _)| p)
+        .collect()
     }
 }
 
@@ -446,9 +465,9 @@ mod tests {
 
     #[test]
     fn test_chord_at_time() {
-        for (filename, times, goals) in [
-            ("healing4", vec![1.0], vec![(NL::A, N, ChordMode::Major)])
-        ] {
+        for (filename, times, goals) in
+            [("healing4", vec![1.0], vec![(NL::A, N, ChordMode::Major)])]
+        {
             let recording: Recording = Recording::from_file(filename).unwrap();
             let progression = ChordProgression::from(&recording);
             for (time, (letter, modifier, mode)) in times.iter().zip(goals.iter()) {

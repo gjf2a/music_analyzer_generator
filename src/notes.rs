@@ -308,8 +308,24 @@ impl Note {
 
 impl From<Note> for (f64, MidiMsg) {
     fn from(value: Note) -> Self {
-        let msg = if value.velocity == 0  {ChannelVoiceMsg::NoteOff {note: value.pitch, velocity: value.velocity} } else {ChannelVoiceMsg::NoteOn { note: value.pitch, velocity: value.velocity }};
-        (value.duration, MidiMsg::ChannelVoice { channel: Channel::Ch1, msg })
+        let msg = if value.velocity == 0 {
+            ChannelVoiceMsg::NoteOff {
+                note: value.pitch,
+                velocity: value.velocity,
+            }
+        } else {
+            ChannelVoiceMsg::NoteOn {
+                note: value.pitch,
+                velocity: value.velocity,
+            }
+        };
+        (
+            value.duration,
+            MidiMsg::ChannelVoice {
+                channel: Channel::Ch1,
+                msg,
+            },
+        )
     }
 }
 
