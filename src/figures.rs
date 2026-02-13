@@ -81,12 +81,15 @@ impl MelodicFigure {
     pub fn fits_at(&self, melody: &Melody, scale: &RootedScale, start: usize) -> bool {
         let projection = self.projected_notes_from(melody[start].pitch(), scale);
         let melody_notes = melody.distinct_pitch_segment(start, projection.len());
-        println!("projection: {projection:?}");
-        println!("melody:     {melody_notes:?}");
         projection
             .iter()
             .zip(melody_notes.iter())
             .all(|(pn, mn)| pn == mn)
+    }
+
+    pub fn fits_ends_at(&self, melody: &Melody, scale: &RootedScale, start: usize, target_pitch: u8) -> bool {
+        let projection = self.projected_notes_from(melody[start].pitch(), scale);
+        projection.last().map_or(false, |pitch| *pitch == target_pitch) && self.fits_at(melody, scale, start)
     }
 
     pub fn len(&self) -> usize {
@@ -853,7 +856,6 @@ mod tests {
             (56, 18, true),
             (56, 22, false),
         ] {
-            println!("{mi} {:?} ? {expected}", figs[fi]);
             assert_eq!(figs[fi].fits_at(&melody, &scale, mi), expected);
         }
     }

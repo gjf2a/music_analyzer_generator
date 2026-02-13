@@ -1,9 +1,9 @@
 use crate::{
     analyzer::Melody,
-    figures::{FigureMatcher, MelodicFigure},
+    figures::MelodicFigure, scales::RootedScale,
 };
 use enum_iterator::all;
-use rand::seq::{IndexedRandom, SliceRandom};
+use rand::seq::IndexedRandom;
 
 pub fn generate_melody_from(src: &Melody) -> Option<Melody> {
     if src.len() < 3 {
@@ -11,67 +11,39 @@ pub fn generate_melody_from(src: &Melody) -> Option<Melody> {
     }
     let mut result = Melody::new();
     let scale = src.highest_weight_scale();
-    let mut starting_pitch = src[0].pitch();
-    result.push(src[0].repitched(starting_pitch));
-    while result.len() + 3 < src.len() {
-        let fig = random_figure();
-        let projection = fig.projected_notes_from(starting_pitch, &scale);
-        add_projection_to(&projection[1..], &mut result, src);
-        starting_pitch = result[result.len() - 1].pitch();
-    }
-
-    match src.len() - result.len() {
-        1 => {}
-        2 => {}
-        _ => {}
+    result.push(src[0]);
+    while result.len() < src.len() {
+        let con_result = result.consolidated_len();
+        let con_src = src.consolidated_len();
+        println!("cr: {con_result} cs: {con_src}; rl: {} sl: {}", result.len(), src.len());
+        if con_result + 2 >= con_src {
+            let slack = con_src - con_result;
+            let start = result.nth_consolidated(con_result - 3 + slack);
+            let fig = random_figure_at_to(start, src[src.len() - 1].pitch(), 3, src, &scale);
+            let projection = fig.projected_notes_from(result[result.len() - 1].pitch(), &scale);
+            add_projection_to(&projection[projection.len() - slack..], &mut result, src);
+        } else {
+            let fig = random_figure();
+            let projection = fig.projected_notes_from(result[result.len() - 1].pitch(), &scale);
+            add_projection_to(&projection[1..], &mut result, src);
+        }
     }
     Some(result)
 }
 
 fn add_projection_to(projection: &[u8], generated: &mut Melody, src: &Melody) {
     let start = generated.len();
-    for (i, note) in projection.iter().enumerate() {
-        generated.push(src[i + start].repitched(*note));
-    }
-}
-
-pub fn generate_melody_idea_1(src: &Melody) -> Option<Melody> {
-    if src.len() < 3 {
-        return None;
-    }
-
-    let mut result = Melody::new();
-    let scale = src.highest_weight_scale();
-    let starter = random_figure();
-    for (i, note) in starter
-        .projected_notes_from(src[0].pitch(), &scale)
-        .iter()
-        .enumerate()
-    {
-        result.push(src[i].repitched(*note));
-    }
-    let mut offset_intervals = (1..=7)
-        .flat_map(|n| [true, false].into_iter().map(move |b| (n, b)))
-        .collect::<Vec<_>>();
-    offset_intervals.push((0, false));
-    for i in (result.len() - 1)..src.len() {
-        let current = result[i].pitch();
-        offset_intervals.shuffle(&mut rand::rng());
-        for (interval, up) in offset_intervals.iter() {
-            let candidate = if *up {
-                scale.note_up(current, *interval)
-            } else {
-                scale.note_down(current, *interval)
-            };
-            result.push(src[i].repitched(candidate.unwrap()));
-            if FigureMatcher::all_notes_matching(&result) {
+    let mut mi = start;
+    for note in projection.iter() {
+        let melody_note = src[mi].pitch();
+        loop {
+            generated.push(src[mi].repitched(*note));
+            mi += 1;
+            if mi == src.len() || src[mi].pitch() != melody_note {
                 break;
-            } else {
-                result.pop();
             }
         }
     }
-    Some(result)
 }
 
 pub fn random_figure() -> MelodicFigure {
@@ -80,18 +52,30 @@ pub fn random_figure() -> MelodicFigure {
     figures.choose(&mut rng).copied().unwrap()
 }
 
-pub fn random_figure_3() -> MelodicFigure {
-    let figures = all::<MelodicFigure>()
-        .filter(|fig| fig.pattern().len() == 2)
-        .collect::<Vec<_>>();
+pub fn random_figure_at(start: usize, fig_notes: usize, melody: &Melody, scale: &RootedScale) -> MelodicFigure {
+    let figures = all::<MelodicFigure>().filter(|f| f.pattern().len() + 1 == fig_notes && f.fits_at(melody, scale, start)).collect::<Vec<_>>();
     let mut rng = rand::rng();
     figures.choose(&mut rng).copied().unwrap()
 }
 
-pub fn random_figure_4() -> MelodicFigure {
-    let figures = all::<MelodicFigure>()
-        .filter(|fig| fig.pattern().len() == 3)
-        .collect::<Vec<_>>();
+pub fn random_figure_at_to(start: usize, target_pitch: u8, fig_notes: usize, melody: &Melody, scale: &RootedScale) -> MelodicFigure {
+    let figures = all::<MelodicFigure>().filter(|f| f.pattern().len() + 1 == fig_notes && f.fits_ends_at(melody, scale, start, target_pitch)).collect::<Vec<_>>();
     let mut rng = rand::rng();
     figures.choose(&mut rng).copied().unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{analyzer::Melody, generator::generate_melody_from};
+
+    #[test]
+    fn test_generator() {
+        let melody = Melody::from_file("joy_world_2")
+            .unwrap()
+            .without_ghosts(0.05);
+        let generated = generate_melody_from(&melody).unwrap();
+        assert_eq!(melody.len(), generated.len());
+        assert_eq!(melody[0], generated[0]);
+        assert_eq!(melody[melody.len() - 1], generated[generated.len() - 1]);
+    }
 }
