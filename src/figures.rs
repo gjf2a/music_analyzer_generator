@@ -97,7 +97,7 @@ impl MelodicFigure {
         let projection = self.projected_notes_from(melody[start].pitch(), scale);
         projection
             .last()
-            .map_or(false, |pitch| *pitch == target_pitch)
+            .map_or(false, |pitch| octave_equivalent(*pitch, target_pitch))
             && self.fits_at(melody, scale, start)
     }
 
