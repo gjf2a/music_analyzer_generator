@@ -401,6 +401,18 @@ impl<'a> Iterator for NoteDirectionIter<'a> {
     }
 }
 
+impl From<Melody> for Recording {
+    fn from(value: Melody) -> Self {
+        let mut timestamp = 0.0;
+        let mut result = Recording::default();
+        for (duration, midi) in value.midi() {
+            result.add_message(timestamp, &midi);
+            timestamp += duration;
+        }
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use midi_note_recorder::Recording;
