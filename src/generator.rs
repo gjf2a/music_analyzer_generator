@@ -1,7 +1,4 @@
-use crate::{
-    analyzer::Melody,
-    figures::MelodicFigure, scales::RootedScale,
-};
+use crate::{analyzer::Melody, figures::MelodicFigure, scales::RootedScale};
 use enum_iterator::all;
 use rand::seq::IndexedRandom;
 
@@ -51,14 +48,31 @@ pub fn random_figure() -> MelodicFigure {
     figures.choose(&mut rng).copied().unwrap()
 }
 
-pub fn random_figure_at(start: usize, fig_notes: usize, melody: &Melody, scale: &RootedScale) -> MelodicFigure {
-    let figures = all::<MelodicFigure>().filter(|f| f.pattern().len() + 1 == fig_notes && f.fits_at(melody, scale, start)).collect::<Vec<_>>();
+pub fn random_figure_at(
+    start: usize,
+    fig_notes: usize,
+    melody: &Melody,
+    scale: &RootedScale,
+) -> MelodicFigure {
+    let figures = all::<MelodicFigure>()
+        .filter(|f| f.pattern().len() + 1 == fig_notes && f.fits_at(melody, scale, start))
+        .collect::<Vec<_>>();
     let mut rng = rand::rng();
     figures.choose(&mut rng).copied().unwrap()
 }
 
-pub fn random_figure_at_to(start: usize, target_pitch: u8, fig_notes: usize, melody: &Melody, scale: &RootedScale) -> MelodicFigure {
-    let figures = all::<MelodicFigure>().filter(|f| f.pattern().len() + 1 == fig_notes && f.fits_ends_at(melody, scale, start, target_pitch)).collect::<Vec<_>>();
+pub fn random_figure_at_to(
+    start: usize,
+    target_pitch: u8,
+    fig_notes: usize,
+    melody: &Melody,
+    scale: &RootedScale,
+) -> MelodicFigure {
+    let figures = all::<MelodicFigure>()
+        .filter(|f| {
+            f.pattern().len() + 1 == fig_notes && f.fits_ends_at(melody, scale, start, target_pitch)
+        })
+        .collect::<Vec<_>>();
     let mut rng = rand::rng();
     figures.choose(&mut rng).copied().unwrap()
 }

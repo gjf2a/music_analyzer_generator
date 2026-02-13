@@ -187,11 +187,24 @@ impl Melody {
     }
 
     pub fn consolidated_len(&self) -> usize {
-        ConsolidatedIter {start: 0, len: 1, melody: self}.count()
+        ConsolidatedIter {
+            start: 0,
+            len: 1,
+            melody: self,
+        }
+        .count()
     }
 
     pub fn nth_consolidated(&self, n: usize) -> usize {
-        ConsolidatedIter {start: 0, len: 1, melody: self}.skip(n).next().unwrap().0
+        ConsolidatedIter {
+            start: 0,
+            len: 1,
+            melody: self,
+        }
+        .skip(n)
+        .next()
+        .unwrap()
+        .0
     }
 
     pub fn push(&mut self, note: Note) {
