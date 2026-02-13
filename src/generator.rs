@@ -15,7 +15,6 @@ pub fn generate_melody_from(src: &Melody) -> Option<Melody> {
     while result.len() < src.len() {
         let con_result = result.consolidated_len();
         let con_src = src.consolidated_len();
-        println!("cr: {con_result} cs: {con_src}; rl: {} sl: {}", result.len(), src.len());
         if con_result + 2 >= con_src {
             let slack = con_src - con_result;
             let start = result.nth_consolidated(con_result - 3 + slack);
