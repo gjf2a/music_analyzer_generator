@@ -277,6 +277,10 @@ impl Note {
         }
     }
 
+    pub fn octave_equivalent(&self, other: Self) -> bool {
+        octave_equivalent(self.pitch, other.pitch) && self.velocity == other.velocity && self.duration == other.duration
+    }
+
     pub fn repitched(&self, repitch: u8) -> Self {
         Self {
             pitch: repitch,

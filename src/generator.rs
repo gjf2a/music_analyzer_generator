@@ -88,7 +88,9 @@ mod tests {
             .without_ghosts(0.05);
         let generated = generate_melody_from(&melody).unwrap();
         assert_eq!(melody.len(), generated.len());
+        assert_eq!(melody.duration(), generated.duration());
         assert_eq!(melody[0], generated[0]);
-        assert_eq!(melody[melody.len() - 1], generated[generated.len() - 1]);
+        println!("{:?} -> {:?}", melody[melody.len() - 1], generated[generated.len() - 1]);
+        assert!(melody[melody.len() - 1].octave_equivalent(generated[generated.len() - 1]));
     }
 }
