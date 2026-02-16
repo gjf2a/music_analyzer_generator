@@ -5,16 +5,17 @@ pub mod generator;
 pub mod notes;
 pub mod scales;
 
-use std::collections::VecDeque;
-
 use midi_fundsp::note_velocity_from;
 use midi_msg::MidiMsg;
-use midi_note_recorder::Recording;
+use midi_note_recorder::{Recording, Timestamp};
+use std::collections::VecDeque;
 
 use crate::{
     chords::{Chord, ChordName},
     notes::{Accidental, NoteLetter, NoteName},
 };
+
+pub type NoteDuration = f64;
 
 const MAJOR_ROOT_IDS: [(NoteLetter, Accidental); 12] = [
     (NoteLetter::C, Accidental::Natural),
@@ -103,7 +104,7 @@ impl FromIterator<u8> for ActivePitches {
 
 #[derive(Clone, Default)]
 pub struct PitchSequence {
-    seq: Vec<(f64, MidiMsg, ActivePitches)>,
+    seq: Vec<(Timestamp, MidiMsg, ActivePitches)>,
 }
 
 impl PitchSequence {
@@ -117,7 +118,7 @@ impl PitchSequence {
         result
     }
 
-    fn push(&mut self, time: f64, msg: &MidiMsg, current: &mut ActivePitches) {
+    fn push(&mut self, time: Timestamp, msg: &MidiMsg, current: &mut ActivePitches) {
         current.update_from(&msg);
         self.seq.push((time, msg.clone(), *current));
     }
@@ -173,7 +174,7 @@ impl PitchSequence {
         None
     }
 
-    pub fn chords_starts_durations(&self) -> Vec<(Chord, f64, f64)> {
+    pub fn chords_starts_durations(&self) -> Vec<(Chord, Timestamp, f64)> {
         let mut pending = None;
         let mut result = vec![];
         let mut last_time = 0.0;
@@ -256,7 +257,7 @@ pub fn durations_notes_from(recording: &Recording) -> Vec<(f64, u8, u8)> {
     result
 }
 
-fn find_first_note(queue: &mut VecDeque<(f64, MidiMsg)>) -> Option<(f64, u8, u8)> {
+fn find_first_note(queue: &mut VecDeque<(Timestamp, MidiMsg)>) -> Option<(Timestamp, u8, u8)> {
     while let Some((time, msg)) = queue.pop_front() {
         if let Some((n, v)) = note_velocity_from(&msg) {
             return Some((time, n, v));

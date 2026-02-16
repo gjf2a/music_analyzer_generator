@@ -79,7 +79,7 @@ impl MelodicFigure {
     }
 
     pub fn fits_at(&self, melody: &Melody, scale: &RootedScale, start: usize) -> bool {
-        let projection = self.projected_notes_from(melody[start].pitch(), scale);
+        let projection = self.projected_notes_from(melody[start].0.pitch(), scale);
         let melody_notes = melody.distinct_pitch_segment(start, projection.len());
         projection
             .iter()
@@ -94,7 +94,7 @@ impl MelodicFigure {
         start: usize,
         target_pitch: u8,
     ) -> bool {
-        let projection = self.projected_notes_from(melody[start].pitch(), scale);
+        let projection = self.projected_notes_from(melody[start].0.pitch(), scale);
         projection
             .last()
             .map_or(false, |pitch| octave_equivalent(*pitch, target_pitch))
@@ -829,7 +829,7 @@ mod tests {
         for ((i, figs), (ei, ep, efigs)) in figures.iter().zip(expected.iter()) {
             println!("{i}: {}", figures2string(figs.iter()));
             assert_eq!(i, ei);
-            assert_eq!(melody[*i].pitch(), *ep);
+            assert_eq!(melody[*i].0.pitch(), *ep);
             assert_eq!(figs.len(), efigs.len());
             for (fig, efig) in figs.iter().zip(efigs) {
                 assert_eq!(format!("{fig}"), *efig);
@@ -934,7 +934,7 @@ mod tests {
         let figures = FigureMatcher::matching_figures_consolidated(&melody);
         for (i, figs) in figures.iter() {
             let figstr = figs.iter().map(|f| format!("{f} ")).collect::<String>();
-            println!("{i}: {} {figstr}\n", melody[*i].pitch());
+            println!("{i}: {} {figstr}\n", melody[*i].0.pitch());
         }
 
         FigureMatcher::show_tables_for(&melody);

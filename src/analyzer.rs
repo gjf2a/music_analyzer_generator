@@ -9,19 +9,19 @@ use midi_fundsp::note_velocity_from;
 use midi_msg::MidiMsg;
 
 use crate::{
-    ChordName, NoteName, PitchSequence,
+    ChordName, NoteDuration, NoteName, PitchSequence,
     notes::Note,
     scales::{RootedScale, all_rooted_scales},
 };
-use midi_note_recorder::Recording;
+use midi_note_recorder::{Recording, Timestamp, TotalDuration};
 
-pub const PHRASE_ENDING_DURATION_MULTIPLIER: f64 = 1.5;
+pub const PHRASE_ENDING_DURATION_MULTIPLIER: NoteDuration = 1.5;
 pub const DURATION_MOVING_WINDOW_SIZE: usize = 4;
 
 #[derive(Debug)]
 pub struct ChordProgression {
-    chords_starts: Vec<(ChordName, f64)>,
-    duration: f64,
+    chords_starts: Vec<(ChordName, Timestamp)>,
+    duration: TotalDuration,
 }
 
 impl ChordProgression {
@@ -29,17 +29,17 @@ impl ChordProgression {
         self.chords_starts.iter().map(|(c, _)| *c)
     }
 
-    pub fn chord_start_end_iter(&self) -> impl Iterator<Item = (ChordName, f64, f64)> {
+    pub fn chord_start_end_iter(&self) -> impl Iterator<Item = (ChordName, Timestamp, Timestamp)> {
         (0..self.len()).map(|i| self.chord_start_end(i))
     }
 
-    pub fn chord_at_time(&self, timestamp: f64) -> Option<ChordName> {
+    pub fn chord_at_time(&self, timestamp: Timestamp) -> Option<ChordName> {
         self.chord_start_end_iter()
             .find(|(_, start, end)| *start <= timestamp && timestamp <= *end)
             .map(|(chord, _, _)| chord)
     }
 
-    pub fn chord_start_end(&self, index: usize) -> (ChordName, f64, f64) {
+    pub fn chord_start_end(&self, index: usize) -> (ChordName, Timestamp, Timestamp) {
         let (chord, start) = self.chords_starts[index];
         let end = if index + 1 == self.len() {
             self.duration
@@ -139,9 +139,10 @@ impl From<&Recording> for ChordProgression {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct Melody {
-    notes: Vec<Note>,
+    notes_starts: Vec<(Note, Timestamp)>,
+    duration: TotalDuration,
 }
 
 impl From<&Recording> for Melody {
@@ -152,23 +153,18 @@ impl From<&Recording> for Melody {
 
 impl From<PitchSequence> for Melody {
     fn from(value: PitchSequence) -> Self {
-        let mut notes: Vec<Note> = vec![];
-        let mut pending_start = None;
+        let mut result = Self::default();
         for (time, msg, _) in value.seq.iter() {
-            if let Some(prev) = notes.last_mut() {
-                if let Some(start) = pending_start {
-                    prev.set_duration(*time - start);
-                    pending_start = None;
-                }
-            }
             if let Some((pitch, velocity)) = note_velocity_from(msg) {
                 if velocity > 0 {
-                    notes.push(Note::new(pitch, velocity));
-                    pending_start = Some(*time);
+                    result.push(Note::new(pitch, velocity), *time);
+                } else {
+                    let (mut last, last_time) = result[result.len() - 1];
+                    last.set_duration(*time - last_time);
                 }
             }
         }
-        Self { notes }
+        result
     }
 }
 
@@ -179,11 +175,11 @@ impl Melody {
     }
 
     pub fn new() -> Self {
-        Self { notes: vec![] }
+        Self::default()
     }
 
     pub fn len(&self) -> usize {
-        self.notes.len()
+        self.notes_starts.len()
     }
 
     pub fn consolidated_len(&self) -> usize {
@@ -207,12 +203,12 @@ impl Melody {
         .0
     }
 
-    pub fn push(&mut self, note: Note) {
-        self.notes.push(note);
+    pub fn push(&mut self, note: Note, starts_at: Timestamp) {
+        self.notes_starts.push((note, starts_at));
     }
 
-    pub fn pop(&mut self) -> Option<Note> {
-        self.notes.pop()
+    pub fn pop(&mut self) -> Option<(Note, Timestamp)> {
+        self.notes_starts.pop()
     }
 
     pub fn starts_notes_lens(&'_ self) -> ConsolidatedIter<'_> {
@@ -223,12 +219,27 @@ impl Melody {
         }
     }
 
-    pub fn midi(&self) -> Vec<(f64, MidiMsg)> {
-        self.iter().map(|n| (*n).into()).collect()
+    pub fn next_note_time(&self, i: usize) -> Timestamp {
+        if i == self.len() {
+            self.duration
+        } else {
+            self[i].1
+        }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &Note> {
-        self.notes.iter()
+    pub fn midi(&self) -> Vec<(Timestamp, MidiMsg)> {
+        let mut result = vec![];
+        for (i, (note, time)) in self.iter().enumerate() {
+            let (on, off) = note.midi_on_off();
+            result.push((*time, on));
+            let note_off_timestamp = self.next_note_time(i) - (*time + note.duration());
+            result.push((note_off_timestamp, off))
+        }
+        result
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &(Note, Timestamp)> {
+        self.notes_starts.iter()
     }
 
     pub fn iter_direction(&self) -> NoteDirectionIter<'_> {
@@ -239,16 +250,16 @@ impl Melody {
         }
     }
 
-    pub fn duration(&self) -> f64 {
-        self.iter().map(|n| n.duration()).sum()
+    pub fn duration(&self) -> TotalDuration {
+        self.duration
     }
 
     pub fn min_max_pitches(&self) -> Option<(u8, u8)> {
         let mut iter = self.iter();
         if let Some(first) = iter.next() {
-            let mut min = first.pitch();
+            let mut min = first.0.pitch();
             let mut max = min;
-            for note in iter {
+            for (note, _) in iter {
                 if note.pitch() < min {
                     min = note.pitch();
                 }
@@ -282,33 +293,36 @@ impl Melody {
         total_weight
     }
 
-    pub fn without_ghosts(&self, longest_ghost: f64) -> Self {
+    pub fn without_ghosts(&self, longest_ghost: NoteDuration) -> Self {
         let mut notes = vec![];
         let mut ghostliness = 0.0;
-        for n in self.iter() {
+        for (n, start) in self.iter() {
             if n.duration() > longest_ghost {
                 let mut n = *n;
                 if ghostliness > 0.0 {
                     n.set_duration(n.duration() + ghostliness);
                     ghostliness = 0.0;
                 }
-                notes.push(n);
+                notes.push((n, *start));
             } else {
                 ghostliness += n.duration();
             }
         }
-        Self { notes }
+        Self {
+            notes_starts: notes,
+            duration: self.duration,
+        }
     }
 
-    pub fn mean_preceding_duration(&self, i: usize) -> Option<f64> {
+    pub fn mean_preceding_duration(&self, i: usize) -> Option<NoteDuration> {
         if i < DURATION_MOVING_WINDOW_SIZE || i >= self.len() {
             None
         } else {
             Some(
                 ((i - DURATION_MOVING_WINDOW_SIZE)..i)
-                    .map(|n| self[n].duration())
-                    .sum::<f64>()
-                    / DURATION_MOVING_WINDOW_SIZE as f64,
+                    .map(|n| self[n].0.duration())
+                    .sum::<NoteDuration>()
+                    / DURATION_MOVING_WINDOW_SIZE as NoteDuration,
             )
         }
     }
@@ -320,7 +334,7 @@ impl Melody {
     pub fn phrase_ends_at(&self, i: usize) -> bool {
         i + 1 == self.len()
             || self.mean_preceding_duration(i).map_or(false, |m| {
-                self[i].duration() > PHRASE_ENDING_DURATION_MULTIPLIER * m
+                self[i].0.duration() > PHRASE_ENDING_DURATION_MULTIPLIER * m
             })
     }
 
@@ -344,7 +358,7 @@ pub struct ConsolidatedIter<'a> {
 
 impl<'a> ConsolidatedIter<'a> {
     fn pitch(&self) -> u8 {
-        self.melody[self.start].pitch()
+        self.melody[self.start].0.pitch()
     }
 
     fn end(&self) -> usize {
@@ -357,7 +371,8 @@ impl<'a> Iterator for ConsolidatedIter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.start < self.melody.len() {
-            while self.end() < self.melody.len() && self.melody[self.end()].pitch() == self.pitch()
+            while self.end() < self.melody.len()
+                && self.melody[self.end()].0.pitch() == self.pitch()
             {
                 self.len += 1;
             }
@@ -372,10 +387,10 @@ impl<'a> Iterator for ConsolidatedIter<'a> {
 }
 
 impl Index<usize> for Melody {
-    type Output = Note;
+    type Output = (Note, Timestamp);
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.notes[index]
+        &self.notes_starts[index]
     }
 }
 
@@ -395,19 +410,19 @@ impl<'a> Iterator for NoteDirectionIter<'a> {
     type Item = (&'a Note, MelodyDirection);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.i >= self.melody.notes.len() {
+        if self.i >= self.melody.notes_starts.len() {
             None
         } else {
             if self.i > 0 {
-                let prev_pitch = self.melody.notes[self.i - 1].pitch();
-                let current_pitch = self.melody.notes[self.i].pitch();
+                let prev_pitch = self.melody.notes_starts[self.i - 1].0.pitch();
+                let current_pitch = self.melody.notes_starts[self.i].0.pitch();
                 if prev_pitch < current_pitch {
                     self.direction = MelodyDirection::Ascending;
                 } else if prev_pitch > current_pitch {
                     self.direction = MelodyDirection::Descending;
                 }
             }
-            let result = Some((&self.melody.notes[self.i], self.direction));
+            let result = Some((&self.melody.notes_starts[self.i].0, self.direction));
             self.i += 1;
             result
         }
@@ -620,11 +635,14 @@ mod tests {
         let notes = melody
             .iter()
             .enumerate()
-            .map(|(i, n)| (i, n.pitch(), n.duration()))
+            .map(|(i, (n, _))| (i, n.pitch(), n.duration()))
             .collect::<Vec<_>>();
         for (i, n, d) in notes.iter() {
             let phrase_end = if melody.phrase_ends_at(*i) { "*" } else { "" };
             println!("{i}: {n} {d:.3}{phrase_end}");
+        }
+        for (i, (d, m)) in melody.midi().iter().enumerate() {
+            println!("{i}: {m:?} {d:.2}");
         }
     }
 }

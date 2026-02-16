@@ -3,7 +3,7 @@ use std::{fmt::Display, ops::Add};
 use enum_iterator::Sequence;
 use midi_msg::{Channel, ChannelVoiceMsg, MidiMsg};
 
-use crate::MAJOR_ROOT_IDS;
+use crate::{MAJOR_ROOT_IDS, NoteDuration};
 
 pub fn octave_equivalent(p1: u8, p2: u8) -> bool {
     p1 % 12 == p2 % 12
@@ -265,7 +265,7 @@ impl Display for NoteName {
 pub struct Note {
     pitch: u8,
     velocity: u8,
-    duration: f64,
+    duration: NoteDuration,
 }
 
 impl Note {
@@ -278,7 +278,9 @@ impl Note {
     }
 
     pub fn octave_equivalent(&self, other: Self) -> bool {
-        octave_equivalent(self.pitch, other.pitch) && self.velocity == other.velocity && self.duration == other.duration
+        octave_equivalent(self.pitch, other.pitch)
+            && self.velocity == other.velocity
+            && self.duration == other.duration
     }
 
     pub fn repitched(&self, repitch: u8) -> Self {
@@ -301,35 +303,37 @@ impl Note {
         self.velocity
     }
 
-    pub fn duration(&self) -> f64 {
+    pub fn duration(&self) -> NoteDuration {
         self.duration
     }
 
-    pub fn set_duration(&mut self, new_duration: f64) {
+    pub fn set_duration(&mut self, new_duration: NoteDuration) {
         self.duration = new_duration;
+    }
+
+    pub fn midi_on_off(&self) -> (MidiMsg, MidiMsg) {
+        (
+            make_midi_msg(self.pitch, self.velocity),
+            make_midi_msg(self.pitch, 0),
+        )
     }
 }
 
-impl From<Note> for (f64, MidiMsg) {
-    fn from(value: Note) -> Self {
-        let msg = if value.velocity == 0 {
-            ChannelVoiceMsg::NoteOff {
-                note: value.pitch,
-                velocity: value.velocity,
-            }
-        } else {
-            ChannelVoiceMsg::NoteOn {
-                note: value.pitch,
-                velocity: value.velocity,
-            }
-        };
-        (
-            value.duration,
-            MidiMsg::ChannelVoice {
-                channel: Channel::Ch1,
-                msg,
-            },
-        )
+fn make_midi_msg(pitch: u8, velocity: u8) -> MidiMsg {
+    let msg = if velocity == 0 {
+        ChannelVoiceMsg::NoteOff {
+            note: pitch,
+            velocity,
+        }
+    } else {
+        ChannelVoiceMsg::NoteOn {
+            note: pitch,
+            velocity,
+        }
+    };
+    MidiMsg::ChannelVoice {
+        channel: Channel::Ch1,
+        msg,
     }
 }
 
