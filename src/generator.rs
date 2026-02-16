@@ -13,6 +13,7 @@ pub fn generate_melody_from(src: &Melody) -> Option<Melody> {
     while result.len() < src.len() {
         let con_result = result.consolidated_len();
         let con_src = src.consolidated_len();
+        let slack = con_src - con_result;
         let (figure, start) = random_fitting_figure(&result, &scale, src.len(), src[src.len() - 1].0.pitch());
         let projection = figure.projected_notes_from(result[start].0.pitch(), &scale);
         let projection_start = result.len() - start;
@@ -85,6 +86,8 @@ pub fn all_fitting_figures(melody: &Melody, scale: &RootedScale, target_len: usi
         for backup in 0..fig.pattern().len() {
             if melody.len() >= backup + 1 {
                 let start = melody.len() - backup - 1;
+                
+
                 if start + fig.pattern().len() < target_len {
                     if fig.fits_at(melody, scale, start) {
                         result.push((fig, start));

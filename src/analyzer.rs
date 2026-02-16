@@ -1,7 +1,5 @@
 use std::{
-    cmp::{Ordering, min},
-    collections::HashMap,
-    ops::Index,
+    cmp::{Ordering, min}, collections::HashMap, ops::Index
 };
 
 use hash_histogram::HashHistogram;
@@ -224,6 +222,12 @@ impl Melody {
         }
     }
 
+    pub fn starts_notes_lens_reverse(&'_ self, start: usize) -> impl Iterator<Item=(usize, u8, usize)> {
+        ConsolidatedIter {
+            start, len: 1, melody: self
+        }.rev()
+    }
+
     pub fn next_note_time(&self, i: usize) -> Timestamp {
         if i == self.len() {
             self.duration
@@ -383,6 +387,23 @@ impl<'a> Iterator for ConsolidatedIter<'a> {
             }
             let result = (self.start, self.pitch(), self.len);
             self.start += self.len;
+            self.len = 1;
+            Some(result)
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a> DoubleEndedIterator for ConsolidatedIter<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.start > 0 {
+            self.start -= 1;
+            while self.start > 0 && self.melody[self.end()].0.pitch() == self.pitch() {
+                self.start -= 1;
+                self.len += 1;
+            }
+            let result = (self.start, self.pitch(), self.len);
             self.len = 1;
             Some(result)
         } else {
@@ -630,6 +651,10 @@ mod tests {
         ];
         let consolidated = melody.starts_notes_lens().collect::<Vec<_>>();
         assert_eq!(consolidated, expected_consolidated);
+
+        let mut consolidated_rev = melody.starts_notes_lens_reverse(74).collect::<Vec<_>>();
+        consolidated_rev.reverse();
+        assert_eq!(consolidated_rev, expected_consolidated);
     }
 
     #[test]
