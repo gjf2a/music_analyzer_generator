@@ -1,5 +1,7 @@
 use std::{
-    cmp::{Ordering, min}, collections::HashMap, ops::Index
+    cmp::{Ordering, min},
+    collections::HashMap,
+    ops::Index,
 };
 
 use hash_histogram::HashHistogram;
@@ -162,7 +164,7 @@ impl From<PitchSequence> for Melody {
                     let (last, last_time) = &mut result.notes_starts[end];
                     let last_duration = *time - *last_time;
                     last.set_duration(last_duration);
-                    result.duration = *time + DURATION_BUFFER; 
+                    result.duration = *time + DURATION_BUFFER;
                 }
             }
         }
@@ -185,20 +187,11 @@ impl Melody {
     }
 
     pub fn consolidated_len(&self) -> usize {
-        ConsolidatedIter {
-            start: 0,
-            len: 1,
-            melody: self,
-        }
-        .count()
+        ConsolidatedIter::new(self).count()
     }
 
     pub fn nth_consolidated(&self, n: usize) -> usize {
-        ConsolidatedIter {
-            start: 0,
-            len: 1,
-            melody: self,
-        }
+        ConsolidatedIter::new(self)
         .skip(n)
         .next()
         .unwrap()
@@ -215,17 +208,15 @@ impl Melody {
     }
 
     pub fn starts_notes_lens(&'_ self) -> ConsolidatedIter<'_> {
-        ConsolidatedIter {
-            start: 0,
-            len: 1,
-            melody: self,
-        }
+        ConsolidatedIter::new(self)
     }
 
-    pub fn starts_notes_lens_reverse(&'_ self, start: usize) -> impl Iterator<Item=(usize, u8, usize)> {
-        ConsolidatedIter {
-            start, len: 1, melody: self
-        }.rev()
+    pub fn starts_notes_lens_reverse(
+        &'_ self,
+        start: usize,
+    ) -> impl Iterator<Item = (usize, u8, usize)> {
+        ConsolidatedIter::new_from(self, start)
+        .rev()
     }
 
     pub fn next_note_time(&self, i: usize) -> Timestamp {
@@ -348,11 +339,7 @@ impl Melody {
     }
 
     pub fn distinct_pitch_segment(&self, start: usize, len: usize) -> Vec<u8> {
-        ConsolidatedIter {
-            start,
-            len: 1,
-            melody: self,
-        }
+        ConsolidatedIter::new_from(self, start)
         .take(min(len, self.len() - start))
         .map(|(_, p, _)| p)
         .collect()
@@ -361,17 +348,36 @@ impl Melody {
 
 pub struct ConsolidatedIter<'a> {
     start: usize,
-    len: usize,
+    len_forward: usize,
+    after_end: usize,
     melody: &'a Melody,
 }
 
 impl<'a> ConsolidatedIter<'a> {
+    fn new(melody: &'a Melody) -> Self {
+        Self {
+            start: 0,
+            len_forward: 1,
+            after_end: melody.len(),
+            melody
+        }
+    }
+
+    fn new_from(melody: &'a Melody, start: usize) -> Self {
+        Self {
+            start,
+            len_forward: 1,
+            after_end: start + 1,
+            melody,
+        }
+    }
+
     fn pitch(&self) -> u8 {
         self.melody[self.start].0.pitch()
     }
 
     fn end(&self) -> usize {
-        self.start + self.len
+        self.start + self.len_forward
     }
 }
 
@@ -383,11 +389,11 @@ impl<'a> Iterator for ConsolidatedIter<'a> {
             while self.end() < self.melody.len()
                 && self.melody[self.end()].0.pitch() == self.pitch()
             {
-                self.len += 1;
+                self.len_forward += 1;
             }
-            let result = (self.start, self.pitch(), self.len);
-            self.start += self.len;
-            self.len = 1;
+            let result = (self.start, self.pitch(), self.len_forward);
+            self.start += self.len_forward;
+            self.len_forward = 1;
             Some(result)
         } else {
             None
@@ -397,15 +403,24 @@ impl<'a> Iterator for ConsolidatedIter<'a> {
 
 impl<'a> DoubleEndedIterator for ConsolidatedIter<'a> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        if self.start > 0 {
-            self.start -= 1;
-            while self.start > 0 && self.melody[self.end()].0.pitch() == self.pitch() {
-                self.start -= 1;
-                self.len += 1;
+        if self.after_end > 0 {
+            let prev = self.after_end - 1;
+            let mut i = prev;
+            loop {
+                if self.melody[i].0.pitch() != self.melody[prev].0.pitch() {
+                    let start = i + 1;
+                    let result = (start, self.melody[prev].0.pitch(), self.after_end - start);
+                    self.after_end = start;
+                    return Some(result);
+                }
+                if i > 0 {
+                    i -= 1;
+                } else {
+                    let result = (0, self.melody[0].0.pitch(), self.after_end);
+                    self.after_end = 0;
+                    return Some(result);
+                }
             }
-            let result = (self.start, self.pitch(), self.len);
-            self.len = 1;
-            Some(result)
         } else {
             None
         }
@@ -652,7 +667,7 @@ mod tests {
         let consolidated = melody.starts_notes_lens().collect::<Vec<_>>();
         assert_eq!(consolidated, expected_consolidated);
 
-        let mut consolidated_rev = melody.starts_notes_lens_reverse(74).collect::<Vec<_>>();
+        let mut consolidated_rev = melody.starts_notes_lens().rev().collect::<Vec<_>>();
         consolidated_rev.reverse();
         assert_eq!(consolidated_rev, expected_consolidated);
     }
@@ -674,5 +689,19 @@ mod tests {
         for (i, (d, m)) in melody.midi().iter().enumerate() {
             println!("{i}: {m:?} {d:.2}");
         }
+    }
+
+    #[test]
+    fn vec_iter_rev_demo() {
+        // The purpose of this test is to demonstrate the intended semantics of 
+        // reversal iterators in Rust, in order to guide my design of my own.
+        // Note that the one-and-same iterator separately tracks forward and reverse
+        // movement. This isn't what I expected - I figured that they were consolidated.
+        let v = vec!["a", "b", "c", "d", "e"];
+        let mut viter = v.iter();
+        assert_eq!("a", *viter.next().unwrap());
+        assert_eq!("e", *viter.next_back().unwrap());
+        assert_eq!("b", *viter.next().unwrap());
+        assert_eq!("d", *viter.next_back().unwrap());
     }
 }

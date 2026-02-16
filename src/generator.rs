@@ -14,7 +14,8 @@ pub fn generate_melody_from(src: &Melody) -> Option<Melody> {
         let con_result = result.consolidated_len();
         let con_src = src.consolidated_len();
         let slack = con_src - con_result;
-        let (figure, start) = random_fitting_figure(&result, &scale, src.len(), src[src.len() - 1].0.pitch());
+        let (figure, start) =
+            random_fitting_figure(&result, &scale, src.len(), src[src.len() - 1].0.pitch());
         let projection = figure.projected_notes_from(result[start].0.pitch(), &scale);
         let projection_start = result.len() - start;
         add_projection_to(&projection[projection_start..], &mut result, src);
@@ -37,8 +38,19 @@ fn add_projection_to(projection: &[u8], generated: &mut Melody, src: &Melody) {
     }
 }
 
-pub fn random_figure(starting_pitch: u8, scale: &RootedScale, min_pitch: u8, max_pitch: u8) -> MelodicFigure {
-    let figures = all::<MelodicFigure>().filter(|fig| fig.projected_notes_from(starting_pitch, scale).iter().all(|n| min_pitch <= *n && *n <= max_pitch)).collect::<Vec<_>>();
+pub fn random_figure(
+    starting_pitch: u8,
+    scale: &RootedScale,
+    min_pitch: u8,
+    max_pitch: u8,
+) -> MelodicFigure {
+    let figures = all::<MelodicFigure>()
+        .filter(|fig| {
+            fig.projected_notes_from(starting_pitch, scale)
+                .iter()
+                .all(|n| min_pitch <= *n && *n <= max_pitch)
+        })
+        .collect::<Vec<_>>();
     let mut rng = rand::rng();
     figures.choose(&mut rng).copied().unwrap()
 }
@@ -68,25 +80,37 @@ pub fn random_figure_at_to(
             f.pattern().len() + 1 == fig_notes && f.fits_ends_at(melody, scale, start, target_pitch)
         })
         .collect::<Vec<_>>();
-    let projections = figures.iter().map(|fig| fig.projected_notes_from(melody[start].0.pitch(), scale)).collect::<Vec<_>>();
+    let projections = figures
+        .iter()
+        .map(|fig| fig.projected_notes_from(melody[start].0.pitch(), scale))
+        .collect::<Vec<_>>();
     println!("target: {target_pitch}: {projections:?}");
     let mut rng = rand::rng();
     figures.choose(&mut rng).copied().unwrap()
 }
 
-pub fn random_fitting_figure(melody: &Melody, scale: &RootedScale, target_len: usize, ending_pitch: u8) -> (MelodicFigure, usize) {
+pub fn random_fitting_figure(
+    melody: &Melody,
+    scale: &RootedScale,
+    target_len: usize,
+    ending_pitch: u8,
+) -> (MelodicFigure, usize) {
     let candidates = all_fitting_figures(melody, scale, target_len, ending_pitch);
     let mut rng = rand::rng();
     candidates.choose(&mut rng).copied().unwrap()
 }
 
-pub fn all_fitting_figures(melody: &Melody, scale: &RootedScale, target_len: usize, ending_pitch: u8) -> Vec<(MelodicFigure, usize)> {
+pub fn all_fitting_figures(
+    melody: &Melody,
+    scale: &RootedScale,
+    target_len: usize,
+    ending_pitch: u8,
+) -> Vec<(MelodicFigure, usize)> {
     let mut result = vec![];
     for fig in all::<MelodicFigure>() {
         for backup in 0..fig.pattern().len() {
             if melody.len() >= backup + 1 {
                 let start = melody.len() - backup - 1;
-                
 
                 if start + fig.pattern().len() < target_len {
                     if fig.fits_at(melody, scale, start) {
