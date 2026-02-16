@@ -62,6 +62,8 @@ pub fn all_possible_extensions_for(target: &Melody, src: &Melody, scale: &Rooted
 mod tests {
     use crate::{analyzer::Melody, generator::generate_melody_from};
 
+    // TODO: Write unit tests for add_projection_to() and all_possible_extensions_for()
+
     #[test]
     fn test_generator() {
         let melody = Melody::from_file("joy_world_2")
