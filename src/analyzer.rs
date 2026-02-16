@@ -211,14 +211,6 @@ impl Melody {
         ConsolidatedIter::new(self)
     }
 
-    pub fn starts_notes_lens_reverse(
-        &'_ self,
-        start: usize,
-    ) -> impl Iterator<Item = (usize, u8, usize)> {
-        ConsolidatedIter::new_from(self, start)
-        .rev()
-    }
-
     pub fn next_note_time(&self, i: usize) -> Timestamp {
         if i == self.len() {
             self.duration
