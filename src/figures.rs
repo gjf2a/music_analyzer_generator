@@ -66,7 +66,7 @@ impl MelodicFigure {
         for diatonic_steps in self.pattern() {
             let current = pattern_notes[pattern_notes.len() - 1];
             if diatonic_steps > 0 {
-                pattern_notes.push(scale.note_up(current, diatonic_steps as usize + 1).unwrap());
+                pattern_notes.push(scale.note_up(current, diatonic_steps as usize + 1).unwrap()); // TODO: Remove unwrap!
             } else {
                 pattern_notes.push(
                     scale

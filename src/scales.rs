@@ -608,6 +608,7 @@ mod tests {
             (root2, SM::MelodicMinor, 66, 1, 66),
             (root2, SM::MelodicMinor, 66, 6, 75),
             (root3, SM::MelodicMinor, 58, 7, 69),
+            (root1, SM::Major, 61, 3, 65),
         ] {
             let scale = mode.rooted(root);
             assert_eq!(scale.note_up(current, interval).unwrap(), expected);

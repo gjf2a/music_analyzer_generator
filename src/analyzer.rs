@@ -16,6 +16,7 @@ use crate::{
 use midi_note_recorder::{Recording, Timestamp, TotalDuration};
 
 pub const PHRASE_ENDING_DURATION_MULTIPLIER: NoteDuration = 1.5;
+pub const DURATION_BUFFER: NoteDuration = 0.5;
 pub const DURATION_MOVING_WINDOW_SIZE: usize = 4;
 
 #[derive(Debug)]
@@ -159,8 +160,11 @@ impl From<PitchSequence> for Melody {
                 if velocity > 0 {
                     result.push(Note::new(pitch, velocity), *time);
                 } else {
-                    let (mut last, last_time) = result[result.len() - 1];
-                    last.set_duration(*time - last_time);
+                    let end = result.len() - 1;
+                    let (last, last_time) = &mut result.notes_starts[end];
+                    let last_duration = *time - *last_time;
+                    last.set_duration(last_duration);
+                    result.duration = *time + DURATION_BUFFER; 
                 }
             }
         }
@@ -205,6 +209,7 @@ impl Melody {
 
     pub fn push(&mut self, note: Note, starts_at: Timestamp) {
         self.notes_starts.push((note, starts_at));
+        self.duration = starts_at + note.duration();
     }
 
     pub fn pop(&mut self) -> Option<(Note, Timestamp)> {
