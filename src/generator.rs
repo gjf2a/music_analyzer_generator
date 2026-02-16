@@ -13,21 +13,10 @@ pub fn generate_melody_from(src: &Melody) -> Option<Melody> {
     while result.len() < src.len() {
         let con_result = result.consolidated_len();
         let con_src = src.consolidated_len();
-        if con_result + 2 >= con_src {
-            let slack = con_src - con_result;
-            let start = result.nth_consolidated(con_result - 3 + slack);
-            let target_pitch = src[src.len() - 1].0.pitch();
-            let fig = random_figure_at_to(start, target_pitch, 3, &result, &scale);
-            let projection = fig.projected_notes_from(result[result.len() - 1].0.pitch(), &scale);
-            add_projection_to(&projection[projection.len() - slack..], &mut result, src);
-            println!("end: target: {target_pitch} {projection:?}");
-         } else {
-            let starting_pitch = result[result.len() - 1].0.pitch();
-            let fig = random_figure(starting_pitch, &scale, 20, 120);
-            let projection = fig.projected_notes_from(starting_pitch, &scale);
-            add_projection_to(&projection[1..], &mut result, src);
-            println!("mid");
-        }
+        let (figure, start) = random_fitting_figure(&result, &scale, src.len(), src[src.len() - 1].0.pitch());
+        let projection = figure.projected_notes_from(result[start].0.pitch(), &scale);
+        let projection_start = result.len() - start;
+        add_projection_to(&projection[projection_start..], &mut result, src);
     }
     Some(result)
 }
@@ -82,6 +71,33 @@ pub fn random_figure_at_to(
     println!("target: {target_pitch}: {projections:?}");
     let mut rng = rand::rng();
     figures.choose(&mut rng).copied().unwrap()
+}
+
+pub fn random_fitting_figure(melody: &Melody, scale: &RootedScale, target_len: usize, ending_pitch: u8) -> (MelodicFigure, usize) {
+    let candidates = all_fitting_figures(melody, scale, target_len, ending_pitch);
+    let mut rng = rand::rng();
+    candidates.choose(&mut rng).copied().unwrap()
+}
+
+pub fn all_fitting_figures(melody: &Melody, scale: &RootedScale, target_len: usize, ending_pitch: u8) -> Vec<(MelodicFigure, usize)> {
+    let mut result = vec![];
+    for fig in all::<MelodicFigure>() {
+        for backup in 0..fig.pattern().len() {
+            if melody.len() >= backup + 1 {
+                let start = melody.len() - backup - 1;
+                if start + fig.pattern().len() < target_len {
+                    if fig.fits_at(melody, scale, start) {
+                        result.push((fig, start));
+                    }
+                } else if start + fig.pattern().len() == target_len {
+                    if fig.fits_ends_at(melody, scale, start, ending_pitch) {
+                        result.push((fig, start));
+                    }
+                }
+            }
+        }
+    }
+    result
 }
 
 #[cfg(test)]
